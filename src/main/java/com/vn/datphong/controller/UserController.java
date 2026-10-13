@@ -1,0 +1,52 @@
+package com.vn.datphong.controller;
+
+import com.vn.datphong.dto.request.UsersResquest;
+import com.vn.datphong.dto.response.ApiResponse;
+import com.vn.datphong.dto.response.UsersResponse;
+import com.vn.datphong.entity.User;
+import com.vn.datphong.exception.ResourceNotFoundExcept;
+import com.vn.datphong.service.UserService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@Slf4j
+@RequestMapping("/users")
+@RestController
+@RequiredArgsConstructor
+public class UserController {
+    private final UserService userService;
+
+    @GetMapping("/findAll")
+    public ApiResponse<ResponseEntity<List<User>>> findAll() {
+        List<User> listUser = userService.findAll();
+        return ApiResponse.success(ResponseEntity.ok(listUser));
+    }
+
+    @PostMapping("/add") /*Create*/
+    public ApiResponse<UsersResponse> add(@Valid @RequestBody UsersResquest req) {
+        UsersResponse user = userService.create(req);
+        return ApiResponse.success(user);
+    }
+
+    @DeleteMapping("/delete/{id}")
+    public void delete( @PathVariable Long id) {
+        userService.delete(id);
+    }
+
+    @GetMapping("/detail/{id}")
+    public ApiResponse<UsersResponse> findById(@RequestBody Long id) {
+        UsersResponse userR = userService.getById(id);
+        return ApiResponse.success(userR);
+    }
+    @PutMapping("/update/{id}")
+    public ApiResponse<UsersResponse> update ( @PathVariable Long id,@Valid @RequestBody UsersResquest req){
+        if(userService.getById(id) == null) throw new ResourceNotFoundExcept("Id khong ton tai");
+        UsersResponse updated = userService.update(id, req);
+        return ApiResponse.success(updated);
+    }
+}

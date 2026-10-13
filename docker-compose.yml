@@ -1,0 +1,95 @@
+services:
+  app:
+    build: .
+    container_name: datphong-app
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-vivu}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-vephim}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-hoclaptrinh@2026}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-hoclaptrinh@2026}
+      SPRING_DATA_REDIS_DATABASE: 1
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-vephim}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-hoclaptrinh@2026}
+      MINIO_BUCKET: ${MINIO_BUCKET:-vivu-bucket}
+      JWT_SECRET: ${JWT_SECRET:-l75KeZzOvj59cLmq0/toOfAG8IfadlSm6au8JME4Qyw=}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-900000}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16
+    container_name: datphong-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vivu}
+      POSTGRES_USER: ${POSTGRES_USER:-vephim}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hoclaptrinh@2026}
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vephim} -d ${POSTGRES_DB:-vivu}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: datphong-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:-hoclaptrinh@2026}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-hoclaptrinh@2026} ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: datphong-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-vephim}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-hoclaptrinh@2026}
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:9000/minio/health/live"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
