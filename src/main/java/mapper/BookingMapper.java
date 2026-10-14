@@ -1,13 +1,11 @@
-package com.vn.datphong.mapper;
+package mapper;
 
-import com.vn.datphong.dto.request.BookingRequest;
-import com.vn.datphong.dto.response.BookingResponse;
-import com.vn.datphong.entity.Booking;
+import com.vivu.booking.dto.response.BookingResponse;
+import com.vivu.booking.entity.Booking;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-
 public final class BookingMapper {
     public static BookingResponse toResponse(Booking b) {
         return BookingResponse.builder()
@@ -30,7 +28,5 @@ public final class BookingMapper {
                 .createdAt(b.getCreatedAt())
                 .updatedAt(b.getUpdatedAt())
                 .build();
-
     }
-
 }

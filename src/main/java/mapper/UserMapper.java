@@ -1,10 +1,10 @@
-package com.vn.datphong.mapper;
+package mapper;
 
-import com.vn.datphong.dto.request.UsersResquest;
-import com.vn.datphong.dto.response.RoleResponse;
-import com.vn.datphong.dto.response.UsersResponse;
-import com.vn.datphong.entity.User;
-import com.vn.datphong.enums.UserStatus;
+import com.vivu.booking.dto.request.UsersResquest;
+import com.vivu.booking.dto.response.RoleResponse;
+import com.vivu.booking.dto.response.UsersResponse;
+import com.vivu.booking.entity.User;
+import com.vivu.booking.enums.UserStatus;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -27,7 +27,7 @@ public final class UserMapper {
                 .build();
     }
     public static UsersResponse toResponse(User e) {
-        Set<RoleResponse> roles = e.getRoles()
+        Set<RoleResponse> roles = e.getRole()
                 .stream()
                 .map(role -> RoleResponse.builder()
                         .id(role.getId())
