@@ -1,6 +1,6 @@
 package com.vn.datphong.entity;
 
-import com.vivu.booking.enums.MediaTypeEnum;
+import com.vn.datphong.enums.MediaTypeEnum;
 import jakarta.persistence.*;
 import lombok.*;
 

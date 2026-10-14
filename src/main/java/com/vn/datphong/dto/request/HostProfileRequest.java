@@ -1,6 +1,6 @@
 package com.vn.datphong.dto.request;
 
-import com.vivu.booking.enums.HostStatus;
+import com.vn.datphong.enums.HostStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;

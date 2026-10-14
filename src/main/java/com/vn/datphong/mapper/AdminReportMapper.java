@@ -1,6 +1,6 @@
 package com.vn.datphong.mapper;
 
-import com.vivu.booking.dto.response.RevenueReportResponse;
+import com.vn.datphong.dto.response.RevenueReportResponse;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 

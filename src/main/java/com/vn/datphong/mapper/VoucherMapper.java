@@ -1,9 +1,10 @@
 package com.vn.datphong.mapper;
 
 
-import com.vivu.booking.dto.request.VoucherCreateRequest;
-import com.vivu.booking.dto.response.VoucherResponse;
-import com.vivu.booking.entity.Voucher;
+
+import com.vn.datphong.dto.request.VoucherCreateRequest;
+import com.vn.datphong.dto.response.VoucherResponse;
+import com.vn.datphong.entity.Voucher;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 

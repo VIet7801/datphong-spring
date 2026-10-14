@@ -1,10 +1,11 @@
 package com.vn.datphong.mapper;
 
-import com.vivu.booking.dto.request.HostProfileRequest;
-import com.vivu.booking.dto.response.HostProfileResponse;
-import com.vivu.booking.entity.HostProfile;
-import com.vivu.booking.entity.User;
-import com.vivu.booking.enums.HostStatus;
+
+import com.vn.datphong.dto.request.HostProfileRequest;
+import com.vn.datphong.dto.response.HostProfileResponse;
+import com.vn.datphong.entity.HostProfile;
+import com.vn.datphong.entity.User;
+import com.vn.datphong.enums.HostStatus;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 

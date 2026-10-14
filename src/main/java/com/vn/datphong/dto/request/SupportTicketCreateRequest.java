@@ -1,6 +1,6 @@
 package com.vn.datphong.dto.request;
 
-import com.vivu.booking.enums.TicketTypeEnum;
+import com.vn.datphong.enums.TicketTypeEnum;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;

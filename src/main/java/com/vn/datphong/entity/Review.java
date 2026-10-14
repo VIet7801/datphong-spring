@@ -1,6 +1,6 @@
 package com.vn.datphong.entity;
 
-import com.vivu.booking.enums.ReviewStatusType;
+import com.vn.datphong.enums.ReviewStatusType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;

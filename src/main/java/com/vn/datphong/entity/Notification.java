@@ -1,7 +1,8 @@
 package com.vn.datphong.entity;
 
-import com.vivu.booking.enums.NotificationChannelType;
-import com.vivu.booking.enums.NotificationTypeEnum;
+
+import com.vn.datphong.enums.NotificationChannelType;
+import com.vn.datphong.enums.NotificationTypeEnum;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;

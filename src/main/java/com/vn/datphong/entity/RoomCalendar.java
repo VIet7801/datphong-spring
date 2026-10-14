@@ -1,6 +1,6 @@
 package com.vn.datphong.entity;
 
-import com.vivu.booking.enums.CalendarStatusType;
+import com.vn.datphong.enums.CalendarStatusType;
 import jakarta.persistence.*;
 import lombok.*;
 

@@ -1,6 +1,6 @@
 package com.vn.datphong.dto.request;
 
-import com.vivu.booking.enums.UserStatus;
+import com.vn.datphong.enums.UserStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

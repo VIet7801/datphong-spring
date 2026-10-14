@@ -28,9 +28,6 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UsersResponse create(UsersResquest req) {
-        if(userRepository.existsById(req.getId())){
-            throw new RuntimeException("Id da ton tai ");
-        }
         User user = UserMapper.toEntity(req);
         User saved = userRepository.save(user);
         return UserMapper.toResponse(saved);

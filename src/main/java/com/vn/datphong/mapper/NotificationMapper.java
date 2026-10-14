@@ -1,10 +1,11 @@
 package com.vn.datphong.mapper;
 
-import com.vivu.booking.dto.response.NotificationResponse;
-import com.vivu.booking.entity.Notification;
-import com.vivu.booking.entity.User;
-import com.vivu.booking.enums.NotificationChannelType;
-import com.vivu.booking.enums.NotificationTypeEnum;
+
+import com.vn.datphong.dto.response.NotificationResponse;
+import com.vn.datphong.entity.Notification;
+import com.vn.datphong.entity.User;
+import com.vn.datphong.enums.NotificationChannelType;
+import com.vn.datphong.enums.NotificationTypeEnum;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 

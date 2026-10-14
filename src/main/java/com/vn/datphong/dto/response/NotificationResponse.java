@@ -1,7 +1,8 @@
 package com.vn.datphong.dto.response;
 
-import com.vivu.booking.enums.NotificationChannelType;
-import com.vivu.booking.enums.NotificationTypeEnum;
+
+import com.vn.datphong.enums.NotificationChannelType;
+import com.vn.datphong.enums.NotificationTypeEnum;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

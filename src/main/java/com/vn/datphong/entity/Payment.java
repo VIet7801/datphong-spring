@@ -1,7 +1,8 @@
 package com.vn.datphong.entity;
 
-import com.vivu.booking.enums.PaymentMethodType;
-import com.vivu.booking.enums.PaymentStatusType;
+
+import com.vn.datphong.enums.PaymentMethodType;
+import com.vn.datphong.enums.PaymentStatusType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;

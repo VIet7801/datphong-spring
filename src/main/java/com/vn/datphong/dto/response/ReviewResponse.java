@@ -1,7 +1,8 @@
 package com.vn.datphong.dto.response;
 
-import com.vivu.booking.enums.MediaTypeEnum;
-import com.vivu.booking.enums.ReviewStatusType;
+
+import com.vn.datphong.enums.MediaTypeEnum;
+import com.vn.datphong.enums.ReviewStatusType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

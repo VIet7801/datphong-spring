@@ -1,7 +1,8 @@
 package com.vn.datphong.mapper;
 
-import com.vivu.booking.dto.response.LoyaltyRankResponse;
-import com.vivu.booking.entity.LoyaltyRank;
+
+import com.vn.datphong.dto.response.LoyaltyRankResponse;
+import com.vn.datphong.entity.LoyaltyRank;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 

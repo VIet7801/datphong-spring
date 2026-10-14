@@ -1,8 +1,7 @@
 package com.vn.datphong.entity;
 
-import com.vivu.booking.entity.BaseEntity;
-import com.vivu.booking.entity.User;
-import com.vivu.booking.enums.HostStatus;
+
+import com.vn.datphong.enums.HostStatus;
 import jakarta.persistence.*;
 import lombok.*;
 

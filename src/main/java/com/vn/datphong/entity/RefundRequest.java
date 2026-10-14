@@ -1,7 +1,7 @@
 package com.vn.datphong.entity;
 
-import com.vivu.booking.enums.RefundDestinationType;
-import com.vivu.booking.enums.RefundStatusType;
+import com.vn.datphong.enums.RefundDestinationType;
+import com.vn.datphong.enums.RefundStatusType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;

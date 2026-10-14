@@ -1,7 +1,8 @@
 package com.vn.datphong.dto.request;
 
-import com.vivu.booking.enums.RoomStatus;
-import com.vivu.booking.enums.RoomType;
+
+import com.vn.datphong.enums.RoomStatus;
+import com.vn.datphong.enums.RoomType;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

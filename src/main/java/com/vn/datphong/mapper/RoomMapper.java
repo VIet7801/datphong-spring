@@ -1,10 +1,11 @@
 package com.vn.datphong.mapper;
 
-import com.vivu.booking.dto.request.RoomCreateRequest;
-import com.vivu.booking.dto.response.RoomMediaItem;
-import com.vivu.booking.dto.response.RoomResponse;
-import com.vivu.booking.entity.Room;
-import com.vivu.booking.enums.RoomStatus;
+
+import com.vn.datphong.dto.request.RoomCreateRequest;
+import com.vn.datphong.dto.response.RoomMediaItem;
+import com.vn.datphong.dto.response.RoomResponse;
+import com.vn.datphong.entity.Room;
+import com.vn.datphong.enums.RoomStatus;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 

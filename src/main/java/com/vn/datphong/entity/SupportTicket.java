@@ -1,7 +1,8 @@
 package com.vn.datphong.entity;
 
-import com.vivu.booking.enums.TicketStatusType;
-import com.vivu.booking.enums.TicketTypeEnum;
+
+import com.vn.datphong.enums.TicketStatusType;
+import com.vn.datphong.enums.TicketTypeEnum;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;

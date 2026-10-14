@@ -1,9 +1,11 @@
 package com.vn.datphong.mapper;
 
-import com.vivu.booking.dto.request.UserImportRequest;
-import com.vivu.booking.entity.Role;
-import com.vivu.booking.entity.User;
-import org.mindrot.jbcrypt.BCrypt;
+
+
+import com.vn.datphong.dto.request.UserImportRequest;
+import com.vn.datphong.entity.Role;
+import com.vn.datphong.entity.User;
+import org.springframework.security.crypto.bcrypt.BCrypt;
 
 import java.util.Set;
 
@@ -42,7 +44,7 @@ public final class UserImportMapper {
         user.setActive(request.getActive());
 
         // Gán Role đã lấy từ database
-        user.setRole(roles);
+        user.setRoles(roles);
 
         return user;
     }

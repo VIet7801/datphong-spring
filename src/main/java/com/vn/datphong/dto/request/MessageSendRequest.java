@@ -1,6 +1,6 @@
 package com.vn.datphong.dto.request;
 
-import com.vivu.booking.enums.MessageTypeEnum;
+import com.vn.datphong.enums.MessageTypeEnum;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;

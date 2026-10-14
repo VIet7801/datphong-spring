@@ -1,9 +1,9 @@
 package com.vn.datphong.mapper;
 
-import com.vivu.booking.dto.request.PaymentRequest;
-import com.vivu.booking.dto.response.PaymentResponse;
-import com.vivu.booking.entity.Payment;
-import com.vivu.booking.enums.PaymentStatusType;
+import com.vn.datphong.dto.request.PaymentRequest;
+import com.vn.datphong.dto.response.PaymentResponse;
+import com.vn.datphong.entity.Payment;
+import com.vn.datphong.enums.PaymentStatusType;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 

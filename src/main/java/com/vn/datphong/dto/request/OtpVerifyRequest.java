@@ -1,6 +1,6 @@
 package com.vn.datphong.dto.request;
 
-import com.vivu.booking.enums.OtpPurposeType;
+import com.vn.datphong.enums.OtpPurposeType;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

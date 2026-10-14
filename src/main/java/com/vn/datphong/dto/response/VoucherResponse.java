@@ -1,8 +1,9 @@
 package com.vn.datphong.dto.response;
 
-import com.vivu.booking.entity.LoyaltyRank;
-import com.vivu.booking.enums.DiscountTypeEnum;
-import com.vivu.booking.enums.VoucherOwnerType;
+
+import com.vn.datphong.entity.LoyaltyRank;
+import com.vn.datphong.enums.DiscountTypeEnum;
+import com.vn.datphong.enums.VoucherOwnerType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
