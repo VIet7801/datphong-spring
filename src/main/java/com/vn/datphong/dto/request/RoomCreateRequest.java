@@ -13,6 +13,12 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class RoomCreateRequest {
+    private Long propertyId;
+
+    private Long roomTypeId;
+
+    private Long roomUnitId;
+
     @NotBlank
     @Size(max = 20)
     private String code;

@@ -20,6 +20,9 @@ public class PaymentRequest {
     @NotNull(message = "Phương thức thanh toán không được để trống")
     private PaymentMethodType method;
 
+    @NotBlank(message = "idempotencyKey khong duoc de trong")
+    private String idempotencyKey;
+
     /** URL FE muốn cổng thanh toán redirect về sau khi thanh toán xong. */
     @NotBlank(message = "returnUrl không được để trống")
     private String returnUrl;

@@ -33,6 +33,10 @@ public class Review {
     @JoinColumn(name = "room_id", nullable = false)
     private Room room;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "property_id")
+    private Property property;
+
     @Column(nullable = false)
     private Short rating;
 

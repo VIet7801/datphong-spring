@@ -13,7 +13,8 @@ public final class PaymentMapper {
     public static Payment toEntity(PaymentRequest req) {
         return Payment.builder()
                 .method(req.getMethod())
-                .status(PaymentStatusType.PENDING)
+                .status(PaymentStatusType.INITIATED)
+                .idempotencyKey(req.getIdempotencyKey())
                 .build();
     }
 
@@ -23,10 +24,16 @@ public final class PaymentMapper {
                 .id(e.getId())
                 .bookingId(e.getBooking()!=null?e.getBooking().getId():null)
                 .method(e.getMethod())
+                .provider(e.getProvider())
                 .amount(e.getAmount())
+                .currency(e.getCurrency())
                 .status(e.getStatus())
                 .gatewayTransactionRef(e.getGatewayTransactionRef())
+                .providerReference(e.getProviderReference())
+                .failureCode(e.getFailureCode())
+                .failureMessage(e.getFailureMessage())
                 .paidAt(e.getPaidAt())
+                .capturedAt(e.getCapturedAt())
                 .paymentUrl(null)
                 .build();
     }

@@ -1,6 +1,7 @@
 package com.vn.datphong.entity;
 
 import com.vn.datphong.enums.PaymentMethodType;
+import com.vn.datphong.enums.PaymentProvider;
 import com.vn.datphong.enums.PaymentStatusType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -32,8 +33,17 @@ public class Payment extends BaseEntity {
     @Column(nullable = false, columnDefinition = "payment_method_type")
     private PaymentMethodType method;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 30)
+    @Builder.Default
+    private PaymentProvider provider = PaymentProvider.FAKE_BANK;
+
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
+
+    @Column(nullable = false, length = 5)
+    @Builder.Default
+    private String currency = "VND";
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.NAMED_ENUM)
@@ -44,6 +54,30 @@ public class Payment extends BaseEntity {
     @Column(name = "gateway_transaction_ref", length = 100)
     private String gatewayTransactionRef;
 
+    @Column(name = "provider_reference", unique = true, length = 120)
+    private String providerReference;
+
+    @Column(name = "idempotency_key", length = 120)
+    private String idempotencyKey;
+
+    @Column(name = "request_hash", length = 128)
+    private String requestHash;
+
+    @Column(name = "failure_code", length = 80)
+    private String failureCode;
+
+    @Column(name = "failure_message", length = 500)
+    private String failureMessage;
+
+    @Column(name = "callback_payload", columnDefinition = "TEXT")
+    private String callbackPayload;
+
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
+
+    @Column(name = "captured_at")
+    private LocalDateTime capturedAt;
+
+    @Version
+    private Long version;
 }
