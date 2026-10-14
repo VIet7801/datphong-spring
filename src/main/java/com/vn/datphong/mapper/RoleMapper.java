@@ -1,8 +1,8 @@
 package com.vn.datphong.mapper;
 
-import com.vivu.booking.dto.request.RoleCreateRequest;
-import com.vivu.booking.dto.response.RoleResponse;
-import com.vivu.booking.entity.Role;
+import com.vn.datphong.dto.request.RoleCreateRequest;
+import com.vn.datphong.dto.response.RoleResponse;
+import com.vn.datphong.entity.Role;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 

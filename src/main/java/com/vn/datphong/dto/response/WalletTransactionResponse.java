@@ -1,6 +1,6 @@
 package com.vn.datphong.dto.response;
 
-import com.vivu.booking.enums.WalletTxType;
+import com.vn.datphong.enums.WalletTxType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

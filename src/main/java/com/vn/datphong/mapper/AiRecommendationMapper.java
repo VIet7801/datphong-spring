@@ -1,7 +1,7 @@
 package com.vn.datphong.mapper;
 
-import com.vivu.booking.dto.response.AiRecommendationResponse;
-import com.vivu.booking.entity.AI_Recommendations;
+import com.vn.datphong.dto.response.AiRecommendationResponse;
+import com.vn.datphong.entity.AI_Recommendations;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 

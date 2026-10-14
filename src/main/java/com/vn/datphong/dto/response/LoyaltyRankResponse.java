@@ -1,6 +1,6 @@
 package com.vn.datphong.dto.response;
 
-import com.vivu.booking.enums.RankNameType;
+import com.vn.datphong.enums.RankNameType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

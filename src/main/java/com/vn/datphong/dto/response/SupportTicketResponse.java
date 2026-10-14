@@ -1,9 +1,9 @@
 package com.vn.datphong.dto.response;
 
-import com.vivu.booking.entity.Booking;
-import com.vivu.booking.entity.User;
-import com.vivu.booking.enums.TicketStatusType;
-import com.vivu.booking.enums.TicketTypeEnum;
+import com.vn.datphong.entity.Booking;
+import com.vn.datphong.entity.User;
+import com.vn.datphong.enums.TicketStatusType;
+import com.vn.datphong.enums.TicketTypeEnum;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

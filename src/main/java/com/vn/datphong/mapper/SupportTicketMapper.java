@@ -1,9 +1,9 @@
 package com.vn.datphong.mapper;
 
-import com.vivu.booking.dto.request.SupportTicketCreateRequest;
-import com.vivu.booking.dto.response.SupportTicketResponse;
-import com.vivu.booking.entity.SupportTicket;
-import com.vivu.booking.enums.TicketStatusType;
+import com.vn.datphong.dto.request.SupportTicketCreateRequest;
+import com.vn.datphong.dto.response.SupportTicketResponse;
+import com.vn.datphong.entity.SupportTicket;
+import com.vn.datphong.enums.TicketStatusType;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 

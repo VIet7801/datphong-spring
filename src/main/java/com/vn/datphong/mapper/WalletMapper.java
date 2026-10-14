@@ -1,9 +1,9 @@
 package com.vn.datphong.mapper;
 
-import com.vivu.booking.dto.response.WalletResponse;
-import com.vivu.booking.dto.response.WalletTransactionResponse;
-import com.vivu.booking.entity.Wallet;
-import com.vivu.booking.entity.WalletTransaction;
+import com.vn.datphong.dto.response.WalletResponse;
+import com.vn.datphong.dto.response.WalletTransactionResponse;
+import com.vn.datphong.entity.Wallet;
+import com.vn.datphong.entity.WalletTransaction;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 

@@ -1,10 +1,10 @@
 package com.vn.datphong.mapper;
 
-import com.vivu.booking.dto.request.HostVipPackageCreateRequest;
-import com.vivu.booking.dto.response.HostVipPackageResponse;
-import com.vivu.booking.dto.response.HostVipSubscriptionResponse;
-import com.vivu.booking.entity.HostVipPackage;
-import com.vivu.booking.entity.HostVipSubscription;
+import com.vn.datphong.dto.request.HostVipPackageCreateRequest;
+import com.vn.datphong.dto.response.HostVipPackageResponse;
+import com.vn.datphong.dto.response.HostVipSubscriptionResponse;
+import com.vn.datphong.entity.HostVipPackage;
+import com.vn.datphong.entity.HostVipSubscription;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 

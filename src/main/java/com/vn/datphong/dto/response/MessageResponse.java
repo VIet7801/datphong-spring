@@ -1,7 +1,7 @@
 package com.vn.datphong.dto.response;
 
-import com.vivu.booking.entity.User;
-import com.vivu.booking.enums.MessageTypeEnum;
+import com.vn.datphong.entity.User;
+import com.vn.datphong.enums.MessageTypeEnum;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

@@ -1,10 +1,10 @@
 package com.vn.datphong.mapper;
 
-import com.vivu.booking.dto.request.ReviewCreateRequest;
-import com.vivu.booking.dto.response.ReviewResponse;
-import com.vivu.booking.entity.Review;
-import com.vivu.booking.entity.ReviewMedia;
-import com.vivu.booking.enums.ReviewStatusType;
+import com.vn.datphong.dto.request.ReviewCreateRequest;
+import com.vn.datphong.dto.response.ReviewResponse;
+import com.vn.datphong.entity.Review;
+import com.vn.datphong.entity.ReviewMedia;
+import com.vn.datphong.enums.ReviewStatusType;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
