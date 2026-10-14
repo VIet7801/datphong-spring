@@ -1,6 +1,9 @@
 package com.vn.datphong.dto.response;
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> c6cf529492187948577f3f0b5dd5299a95e510d7
 import com.vn.datphong.enums.RoomStatus;
 import com.vn.datphong.enums.RoomType;
 import lombok.AllArgsConstructor;
@@ -17,12 +20,19 @@ import java.util.List;
 @Builder
 public class RoomResponse {
     private Long id;
+    private Long propertyId;
+    private String propertyName;
+    private Long roomTypeId;
+    private String roomTypeName;
+    private Long roomUnitId;
+    private String roomUnitCode;
     private String code;
     private String name;
     private RoomType type;
     private RoomStatus status;
     private Integer capacity;
     private Long pricePerNight;
+    private java.math.BigDecimal basePrice;
     private String description;
     /** Ảnh bìa — URL MinIO của ảnh IMAGE đầu tiên (FE dùng cho card + hero). */
     private String imageUrl;

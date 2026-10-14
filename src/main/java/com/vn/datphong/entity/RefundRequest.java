@@ -28,8 +28,16 @@ public class RefundRequest {
     @JoinColumn(name = "booking_id", nullable = false)
     private Booking booking;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "payment_id")
+    private Payment payment;
+
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
+
+    @Column(nullable = false, length = 5)
+    @Builder.Default
+    private String currency = "VND";
 
     @Column(columnDefinition = "TEXT")
     private String reason;
@@ -55,4 +63,19 @@ public class RefundRequest {
 
     @Column(name = "processed_at")
     private LocalDateTime processedAt;
+
+    @Column(name = "provider_reference", unique = true, length = 120)
+    private String providerReference;
+
+    @Column(name = "idempotency_key", length = 120)
+    private String idempotencyKey;
+
+    @Column(name = "failure_code", length = 80)
+    private String failureCode;
+
+    @Column(name = "failure_message", length = 500)
+    private String failureMessage;
+
+    @Version
+    private Long version;
 }

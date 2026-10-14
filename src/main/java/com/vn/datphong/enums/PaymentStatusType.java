@@ -1,6 +1,13 @@
 package com.vn.datphong.enums;
 
 public enum PaymentStatusType {
-    PENDING, SUCCESS, FAILED, REFUNDED
-
+    PENDING,
+    INITIATED,
+    PROCESSING,
+    SUCCESS,
+    SUCCEEDED,
+    FAILED,
+    TIMED_OUT,
+    REFUNDED,
+    NEEDS_ATTENTION
 }

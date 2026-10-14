@@ -32,6 +32,18 @@ public class Booking extends BaseEntity {
     @JoinColumn(name = "room_id", nullable = false)
     private Room room;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "property_id")
+    private Property property;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "room_type_id")
+    private RoomTypeEntity roomType;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "room_unit_id")
+    private RoomUnit roomUnit;
+
     @Column(name = "checkin_date", nullable = false)
     private LocalDate checkinDate;
 
@@ -50,12 +62,26 @@ public class Booking extends BaseEntity {
     @Column(name = "hold_expires_at")
     private LocalDateTime holdExpiresAt;
 
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
+
     @Column(name = "total_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalPrice;
 
     @Column(nullable = false, length = 5)
     @Builder.Default
     private String currency = "VND";
+
+    @Column(name = "subtotal_amount", precision = 12, scale = 2)
+    private BigDecimal subtotalAmount;
+
+    @Column(name = "tax_amount", precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal taxAmount = BigDecimal.ZERO;
+
+    @Column(name = "fee_amount", precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal feeAmount = BigDecimal.ZERO;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "voucher_id")
@@ -64,4 +90,47 @@ public class Booking extends BaseEntity {
     @Column(name = "loyalty_discount_percent", precision = 5, scale = 2)
     @Builder.Default
     private BigDecimal loyaltyDiscountPercent = BigDecimal.ZERO;
+
+    @Column(name = "idempotency_key", length = 120)
+    private String idempotencyKey;
+
+    @Column(name = "quote_token", length = 120)
+    private String quoteToken;
+
+    @Column(name = "price_version")
+    private Long priceVersion;
+
+    @Column(name = "cancellation_policy_snapshot", columnDefinition = "TEXT")
+    private String cancellationPolicySnapshot;
+
+    @Column(name = "special_request", length = 500)
+    private String specialRequest;
+
+    @Column(name = "confirmed_at")
+    private LocalDateTime confirmedAt;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cancelled_by")
+    private User cancelledBy;
+
+    @Column(name = "cancellation_reason", length = 500)
+    private String cancellationReason;
+
+    @Column(name = "cancellation_fee", precision = 12, scale = 2)
+    private BigDecimal cancellationFee;
+
+    @Column(name = "refundable_amount", precision = 12, scale = 2)
+    private BigDecimal refundableAmount;
+
+    @Column(name = "actual_check_in")
+    private LocalDateTime actualCheckIn;
+
+    @Column(name = "actual_check_out")
+    private LocalDateTime actualCheckOut;
+
+    @Version
+    private Long version;
 }

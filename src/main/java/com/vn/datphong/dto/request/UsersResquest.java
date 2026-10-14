@@ -14,6 +14,8 @@ import java.util.Set;
 @AllArgsConstructor
 @Builder
 public class UsersResquest {
+    private Long id;
+
     @NotBlank(message = "Họ và tên không được để trống")
     @Size(max = 150, message = "Họ và tên không được quá 150 ký tự")
     private String fullName;

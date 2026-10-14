@@ -1,6 +1,9 @@
 package com.vn.datphong.mapper;
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> c6cf529492187948577f3f0b5dd5299a95e510d7
 import com.vn.datphong.dto.request.RoomCreateRequest;
 import com.vn.datphong.dto.response.RoomMediaItem;
 import com.vn.datphong.dto.response.RoomResponse;
@@ -22,6 +25,7 @@ public final class RoomMapper {
                 .status(req.getStatus() != null ? req.getStatus() : RoomStatus.AVAILABLE)
                 .capacity(req.getCapacity())
                 .pricePerNight(req.getPricePerNight())
+                .basePrice(req.getPricePerNight() != null ? java.math.BigDecimal.valueOf(req.getPricePerNight()) : null)
                 .description(req.getDescription())
                 .imageUrl(req.getImageUrl())
                 .active(true)
@@ -38,9 +42,17 @@ public final class RoomMapper {
         List<String> images = safe == null ? null : safe.stream().filter(m -> "IMAGE".equals(m.getMediaType())).map(RoomMediaItem::getUrl).toList();
         List<String> videos = safe == null ? null : safe.stream().filter(m -> "VIDEO".equals(m.getMediaType())).map(RoomMediaItem::getUrl).toList();
         return RoomResponse.builder()
-                .id(e.getId()).code(e.getCode()).name(e.getName())
+                .id(e.getId())
+                .propertyId(e.getProperty() != null ? e.getProperty().getId() : null)
+                .propertyName(e.getProperty() != null ? e.getProperty().getName() : null)
+                .roomTypeId(e.getRoomTypeEntity() != null ? e.getRoomTypeEntity().getId() : null)
+                .roomTypeName(e.getRoomTypeEntity() != null ? e.getRoomTypeEntity().getName() : null)
+                .roomUnitId(e.getRoomUnit() != null ? e.getRoomUnit().getId() : null)
+                .roomUnitCode(e.getRoomUnit() != null ? e.getRoomUnit().getCode() : null)
+                .code(e.getCode()).name(e.getName())
                 .type(e.getType()).status(e.getStatus())
                 .capacity(e.getCapacity()).pricePerNight(e.getPricePerNight())
+                .basePrice(e.getBasePrice())
                 .description(e.getDescription()).imageUrl(e.getImageUrl())
                 .images(images == null || images.isEmpty() ? null : images)
                 .videos(videos == null || videos.isEmpty() ? null : videos)
