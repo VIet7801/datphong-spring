@@ -1,8 +1,6 @@
 package com.vn.datphong.dto.response;
 
-import com.vn.datphong.entity.Room;
-import com.vn.datphong.entity.Voucher;
-import com.vn.datphong.enums.BookingStatusType;
+import com.vivu.booking.enums.BookingStatusType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,17 +9,16 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class BookingResponse {
     private Long id;
-
     private String bookingCode;
 
     private Long userId;
-
     private String userFullName;
 
     private Long roomId;

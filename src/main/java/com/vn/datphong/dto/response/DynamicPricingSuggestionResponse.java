@@ -1,0 +1,29 @@
+package com.vn.datphong.dto.response;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class DynamicPricingSuggestionResponse {
+    private Long id;
+
+    private Long roomId;
+    private String roomName;
+
+    private LocalDate targetDate;
+    private BigDecimal suggestedPrice;
+    private String reason;
+    private String modelVersion;
+    private Boolean applied;
+
+    private LocalDateTime createdAt;
+}

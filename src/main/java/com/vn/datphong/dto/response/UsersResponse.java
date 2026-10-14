@@ -1,6 +1,6 @@
 package com.vn.datphong.dto.response;
 
-import com.vn.datphong.enums.UserStatus;
+import com.vivu.booking.enums.UserStatus;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

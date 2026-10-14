@@ -1,7 +1,7 @@
 package com.vn.datphong.dto.request;
 
-import com.vn.datphong.enums.RoomStatus;
-import com.vn.datphong.enums.RoomType;
+import com.vivu.booking.enums.RoomStatus;
+import com.vivu.booking.enums.RoomType;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
@@ -9,7 +9,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
 
 @Data
 @NoArgsConstructor
@@ -38,5 +37,3 @@ public class RoomUpdateRequest {
 
     private Boolean active;
 }
-
-

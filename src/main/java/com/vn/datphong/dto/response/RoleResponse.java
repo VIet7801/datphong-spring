@@ -1,8 +1,9 @@
 package com.vn.datphong.dto.response;
 
-import lombok.*;
-import org.hibernate.annotations.BatchSize;
-
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
@@ -13,5 +14,4 @@ public class RoleResponse {
     private String code;
     private String name;
     private String description;
-
 }

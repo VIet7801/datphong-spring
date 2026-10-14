@@ -1,7 +1,7 @@
 package com.vn.datphong.dto.response;
 
-import com.vn.datphong.enums.RoomStatus;
-import com.vn.datphong.enums.RoomType;
+import com.vivu.booking.enums.RoomStatus;
+import com.vivu.booking.enums.RoomType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,13 +24,14 @@ public class RoomResponse {
     private Long pricePerNight;
     private String description;
     /** Ảnh bìa — URL MinIO của ảnh IMAGE đầu tiên (FE dùng cho card + hero). */
-//    private String imageUrl;
+    private String imageUrl;
     /** Ảnh chi tiết (room_images trên MinIO, mediaType=IMAGE) — FE render carousel prev/next. */
-//    private List<String> images;
+    private List<String> images;
     /** Video giới thiệu phòng (room_images trên MinIO, mediaType=VIDEO). */
-//    private List<String> videos;
+    private List<String> videos;
     /** Toàn bộ media (ảnh + video) kèm id — dùng cho màn quản lý để xoá từng item. */
-//    private List<RoomMediaItem> media;
+    private List<RoomMediaItem> media;
+    private Boolean active;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

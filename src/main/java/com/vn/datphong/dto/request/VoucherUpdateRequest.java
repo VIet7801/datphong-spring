@@ -1,0 +1,79 @@
+package com.vn.datphong.dto.request;
+
+import com.vivu.booking.entity.LoyaltyRank;
+import com.vivu.booking.entity.User;
+import com.vivu.booking.enums.DiscountTypeEnum;
+import com.vivu.booking.enums.VoucherOwnerType;
+import jakarta.validation.constraints.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class VoucherUpdateRequest {
+
+    @NotNull(message = "Loại chủ sở hữu voucher không được để trống")
+    private VoucherOwnerType type;
+
+    private User user;
+
+    @NotNull(message = "Loại giảm giá không được để trống")
+    private DiscountTypeEnum discountType;
+
+    @DecimalMin(
+            value = "0.01",
+            message = "Giá trị giảm giá phải lớn hơn 0"
+    )
+    private BigDecimal discountValue;
+
+    @Min(
+            value = 1,
+            message = "Số đêm tối thiểu phải lớn hơn hoặc bằng 1"
+    )
+    private Integer minNights;
+
+    @Positive(
+            message = "Giá trị đơn hàng tối thiểu không được âm"
+    )
+    private BigDecimal minOrderValue;
+
+    @NotNull(message = "cấp bậc ưu đãi của đối tượng không được trống")
+    private LoyaltyRank targetRank;
+
+    @NotNull(message = "Thời gian bắt đầu không được để trống")
+    private LocalDateTime validFrom;
+
+    @NotNull(message = "Thời gian kết thúc không được để trống")
+    private LocalDateTime validTo;
+
+    @Min(
+            value = 1,
+            message = "Giới hạn sử dụng tổng phải lớn hơn hoặc bằng 1"
+    )
+    private Integer usageLimitTotal;
+
+    @Min(
+            value = 1,
+            message = "Giới hạn sử dụng mỗi user phải lớn hơn hoặc bằng 1"
+    )
+    private Integer usageLimitPerUser;
+
+
+    @AssertTrue(message = "Thời gian bắt đầu phải trước thời gian kết thúc")
+    public boolean isValidDateRange() {
+
+        // Để @NotNull xử lý trường hợp null
+        if (validFrom == null || validTo == null) {
+            return true;
+        }
+
+        return validFrom.isBefore(validTo);
+    }
+}
