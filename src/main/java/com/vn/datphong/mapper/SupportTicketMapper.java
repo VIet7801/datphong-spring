@@ -1,4 +1,4 @@
-package mapper;
+package com.vn.datphong.mapper;
 
 import com.vivu.booking.dto.request.SupportTicketCreateRequest;
 import com.vivu.booking.dto.response.SupportTicketResponse;

@@ -1,4 +1,4 @@
-package mapper;
+package com.vn.datphong.mapper;
 
 import com.vivu.booking.dto.request.HostVipPackageCreateRequest;
 import com.vivu.booking.dto.response.HostVipPackageResponse;
