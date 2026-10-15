@@ -1,9 +1,5 @@
 package com.vn.datphong.dto.request;
 
-<<<<<<< HEAD
-
-=======
->>>>>>> c6cf529492187948577f3f0b5dd5299a95e510d7
 import com.vn.datphong.enums.RoomStatus;
 import com.vn.datphong.enums.RoomType;
 import jakarta.validation.constraints.*;

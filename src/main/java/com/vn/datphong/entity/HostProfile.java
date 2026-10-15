@@ -1,11 +1,6 @@
 package com.vn.datphong.entity;
 
-<<<<<<< HEAD
 
-=======
-import com.vn.datphong.entity.BaseEntity;
-import com.vn.datphong.entity.User;
->>>>>>> c6cf529492187948577f3f0b5dd5299a95e510d7
 import com.vn.datphong.enums.HostStatus;
 import jakarta.persistence.*;
 import lombok.*;

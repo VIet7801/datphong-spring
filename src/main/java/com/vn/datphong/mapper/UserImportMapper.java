@@ -1,18 +1,11 @@
 package com.vn.datphong.mapper;
 
-<<<<<<< HEAD
 
 
-import com.vn.datphong.dto.request.UserImportRequest;
-import com.vn.datphong.entity.Role;
-import com.vn.datphong.entity.User;
-import org.springframework.security.crypto.bcrypt.BCrypt;
-=======
 import com.vn.datphong.dto.request.UserImportRequest;
 import com.vn.datphong.entity.Role;
 import com.vn.datphong.entity.User;
 import org.mindrot.jbcrypt.BCrypt;
->>>>>>> c6cf529492187948577f3f0b5dd5299a95e510d7
 
 import java.util.Set;
 

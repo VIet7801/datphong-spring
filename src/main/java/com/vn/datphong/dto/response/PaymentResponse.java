@@ -1,12 +1,8 @@
 package com.vn.datphong.dto.response;
 
-<<<<<<< HEAD
 
 import com.vn.datphong.enums.PaymentMethodType;
-=======
-import com.vn.datphong.enums.PaymentMethodType;
 import com.vn.datphong.enums.PaymentProvider;
->>>>>>> c6cf529492187948577f3f0b5dd5299a95e510d7
 import com.vn.datphong.enums.PaymentStatusType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
