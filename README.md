@@ -8,7 +8,10 @@ Spring Boot API for room booking.
 - Docker Desktop
 - Git
 
-## Run with Docker
+## Start dependencies with Docker
+
+Docker Compose runs PostgreSQL, Redis, and MinIO only. Run the Spring Boot
+application from IntelliJ or Maven on port 8080.
 
 Copy the example environment file if you want to customize local credentials:
 
@@ -16,16 +19,20 @@ Copy the example environment file if you want to customize local credentials:
 Copy-Item .env.example .env
 ```
 
-Start the application and its services:
+Start the dependencies:
 
 ```powershell
-docker compose up --build
+docker compose up -d
 ```
+
+MinIO uses the community mirror `dappros/minio:RELEASE.2025-09-07T16-13-09Z`
+because the original `minio/minio` image is no longer publicly available.
+Its healthcheck runs `mc ready local`, which is included in this image.
 
 Useful URLs:
 
 - API: http://localhost:8080
-- Swagger UI: http://localhost:8080/swagger-ui.html
+- Swagger UI (after starting the application): http://localhost:8080/swagger-ui/index.html
 - MinIO Console: http://localhost:9001
 - PostgreSQL: `localhost:5435`
 - Redis: `localhost:6379`
@@ -47,10 +54,15 @@ docker compose down -v
 Start only the dependencies:
 
 ```powershell
-docker compose up -d postgres redis minio
+docker compose up -d
 ```
 
 Then run `com.vn.datphong.DatphongApplication` from the IDE.
+
+After editing Java code, rerun the application in IntelliJ to apply changes.
+If you customize credentials in `.env`, set the matching environment variables
+in the IntelliJ Run Configuration too; the application does not load Compose's
+`.env` file automatically.
 
 The default local configuration uses:
 
@@ -93,5 +105,8 @@ After that, your teammate can clone and run:
 git clone https://github.com/<your-username>/<repo-name>.git
 cd <repo-name>
 Copy-Item .env.example .env
-docker compose up --build
+docker compose up -d
 ```
+
+Open the project in IntelliJ, reload Maven, and run
+`com.vn.datphong.DatphongApplication`.

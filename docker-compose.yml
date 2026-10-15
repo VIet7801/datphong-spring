@@ -1,36 +1,5 @@
 
 services:
-  app:
-    build:
-      context: .
-    restart: unless-stopped
-    environment:
-      SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/${POSTGRES_DB:-vivu}"
-      SPRING_DATASOURCE_USERNAME: "${POSTGRES_USER:-vephim}"
-      SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD:-hoclaptrinh@2026}"
-
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: "6379"
-      SPRING_DATA_REDIS_PASSWORD: "${REDIS_PASSWORD:-hoclaptrinh@2026}"
-      SPRING_DATA_REDIS_DATABASE: "1"
-
-      MINIO_ENDPOINT: "http://minio:9000"
-      MINIO_ACCESS_KEY: "${MINIO_ROOT_USER:-vephim}"
-      MINIO_SECRET_KEY: "${MINIO_ROOT_PASSWORD:-hoclaptrinh@2026}"
-      MINIO_BUCKET: "${MINIO_BUCKET:-vivu-bucket}"
-
-      JWT_SECRET: "${JWT_SECRET:-l75KeZzOvj59cLmq0/toOfAG8IfadlSm6au8JME4Qyw=}"
-      JWT_EXPIRATION_MS: "${JWT_EXPIRATION_MS:-900000}"
-    ports:
-      - "8080:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-
   postgres:
     image: postgres:16
     restart: unless-stopped
@@ -76,6 +45,7 @@ services:
       REDIS_PASSWORD: "${REDIS_PASSWORD:-hoclaptrinh@2026}"
 
   minio:
+    # Community mirror; the official minio/minio image is no longer available.
     image: dappros/minio:RELEASE.2025-09-07T16-13-09Z
     restart: unless-stopped
     environment:
@@ -88,11 +58,7 @@ services:
     volumes:
       - minio_data:/data
     healthcheck:
-      test:
-        - CMD
-        - mc
-        - ready
-        - local
+      test: [ "CMD", "mc", "ready", "local" ]
       interval: 10s
       timeout: 5s
       retries: 10

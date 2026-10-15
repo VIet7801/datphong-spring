@@ -10,20 +10,33 @@ import com.vn.datphong.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
+// Mặc định các thao tác quản lý user chỉ dành cho ADMIN.
+@PreAuthorize("hasAuthority('ROLE_ADMIN')")
 public class UserServiceImpl implements UserService {
     @Lazy
     @Autowired
     private UserRepository userRepository;
 
     @Override
-    public List<User> findAll() {
-        return userRepository.findAll();
+    public List<UsersResponse> findAll() {
+        // 1. Repository truy vấn database và trả về danh sách entity User.
+        return userRepository.findAll()
+                // 2. Tạo Stream để xử lý lần lượt từng User trong danh sách.
+                .stream()
+                // 3. Chuyển mỗi User thành UsersResponse bằng mapper.
+                // UserMapper::toResponse == user -> UserMapper.toResponse(user).
+                // DTO chỉ chứa các trường được phép trả về, không có password và twoFactorSecret.
+                .map(UserMapper::toResponse)
+                // 4. Thu các DTO thành List<UsersResponse> và trả cho controller.
+                // Controller bọc danh sách trong ApiResponse.success(...) để trả JSON cho client.
+                .toList();
     }
 
     @Override
@@ -34,12 +47,16 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    // ADMIN được xem mọi hồ sơ; người dùng khác chỉ được xem chính mình.
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or @userAuthorization.isOwner(#id, authentication)")
     public UsersResponse getById(Long id) {
         User u = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundExcept("Id "+id+"khong ton tai"));
         return UserMapper.toResponse(u);
     }
 
     @Override
+    // Kiểm tra quyền trước khi đọc hoặc cập nhật dữ liệu của user theo ID.
+    @PreAuthorize("hasAuthority('ROLE_ADMIN') or @userAuthorization.isOwner(#id, authentication)")
     @Transactional(propagation = Propagation.REQUIRED)
     public UsersResponse update(Long id,UsersResquest req) {
         User updated = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundExcept("Id: "+id+" khong ton tai"));

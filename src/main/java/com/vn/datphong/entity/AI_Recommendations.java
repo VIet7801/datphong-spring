@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
  * 2) Đổi "role" (ManyToOne tới Role) thành "room" (ManyToOne tới Room) - đúng
  *    nghiệp vụ "gợi ý PHÒNG", không phải gợi ý role.
  * 3) Bỏ columnDefinition = "DECIMAL(6,1) UNSIGNED" (cú pháp MySQL, không hợp
- *    lệ với PostgreSQL) - dùng @Column(precision, scale) chuẩn JPA thay thế.
+ *    lệ với PostgreSQL) - dùng ánh xạ Double mặc định, không khai báo precision/scale.
  * 4) Đổi field "model_version" (snake_case) thành "modelVersion" (chuẩn Java
  *    camelCase) - Lombok tự map sang cột "model_version" qua @Column(name=...).
  */
@@ -42,7 +42,7 @@ public class AI_Recommendations {
     @JoinColumn(name = "room_id", nullable = false)
     private Room room;
 
-    @Column(name = "score", nullable = false, precision = 5, scale = 4)
+    @Column(name = "score", nullable = false)
     private Double score;
 
     @Column(name = "model_version", length = 30)

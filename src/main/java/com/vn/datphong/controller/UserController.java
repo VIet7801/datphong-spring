@@ -3,13 +3,11 @@ package com.vn.datphong.controller;
 import com.vn.datphong.dto.request.UsersResquest;
 import com.vn.datphong.dto.response.ApiResponse;
 import com.vn.datphong.dto.response.UsersResponse;
-import com.vn.datphong.entity.User;
 import com.vn.datphong.exception.ResourceNotFoundExcept;
 import com.vn.datphong.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,9 +20,8 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping("/findAll")
-    public ApiResponse<ResponseEntity<List<User>>> findAll() {
-        List<User> listUser = userService.findAll();
-        return ApiResponse.success(ResponseEntity.ok(listUser));
+    public ApiResponse<List<UsersResponse>> findAll() {
+        return ApiResponse.success(userService.findAll());
     }
 
     @PostMapping("/add") /*Create*/
@@ -39,7 +36,7 @@ public class UserController {
     }
 
     @GetMapping("/detail/{id}")
-    public ApiResponse<UsersResponse> findById(@RequestBody Long id) {
+    public ApiResponse<UsersResponse> findById(@PathVariable Long id) {
         UsersResponse userR = userService.getById(id);
         return ApiResponse.success(userR);
     }
