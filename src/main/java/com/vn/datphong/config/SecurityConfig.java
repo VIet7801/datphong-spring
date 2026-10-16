@@ -20,6 +20,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 
+/**
+ * Cấu hình bảo mật được tạo khi khởi động, không phải điểm xử lý từng request.
+ * Luồng runtime: JWT filter -> kiểm tra URL -> controller -> proxy kiểm tra quyền service.
+ * Xem docs/REQUEST_FLOW.md để theo dõi đầy đủ request/response.
+ */
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
@@ -29,6 +34,7 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    // Provider dùng UserDetailsService để tải user và PasswordEncoder để đối chiếu mật khẩu lúc login.
     @Bean
     public DaoAuthenticationProvider daoAuthenticationProvider(
             CustomUserDetailsService userDetailsService,
@@ -83,6 +89,7 @@ public class SecurityConfig {
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable())
 
+                // Mỗi request cần tự gửi JWT; không duy trì đăng nhập bằng HTTP session.
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(
                                 SessionCreationPolicy.STATELESS
@@ -98,6 +105,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler)
                 )
 
+                // Kiểm tra ở mức URL, trước controller. Quyền ADMIN/chính chủ nằm ở service.
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/auth/login",
@@ -110,6 +118,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
 
+                // Xác thực JWT trước khi chuỗi filter quyết định request có được đi tiếp không.
                 .addFilterBefore(
                         jwtFilter,
                         UsernamePasswordAuthenticationFilter.class

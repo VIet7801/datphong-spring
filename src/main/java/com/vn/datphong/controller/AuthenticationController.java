@@ -22,9 +22,12 @@ public class AuthenticationController {
     public ResponseEntity<ApiResponse<LoginResponse>> login(
             @Valid @RequestBody LoginRequest request
     ) {
+        // MVC đã chuyển JSON thành LoginRequest và validation trước khi vào thân hàm này.
+        // Service kiểm tra thông tin đăng nhập và chỉ tạo token khi xác thực thành công.
         LoginResponse response =
                 authenticationService.login(request);
 
+        // Trả đối tượng Java + HTTP 200; Spring serialize ApiResponse/LoginResponse thành JSON cho FE.
         return ResponseEntity.ok(
                 ApiResponse.customsuccess(
                         "Đăng nhập thành công",

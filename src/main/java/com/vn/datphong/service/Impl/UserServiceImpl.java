@@ -26,6 +26,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public List<UsersResponse> findAll() {
+        // Chỉ đến được thân hàm sau khi proxy kiểm tra @PreAuthorize ở cấp class thành công.
         // 1. Repository truy vấn database và trả về danh sách entity User.
         return userRepository.findAll()
                 // 2. Tạo Stream để xử lý lần lượt từng User trong danh sách.
@@ -59,6 +60,8 @@ public class UserServiceImpl implements UserService {
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or @userAuthorization.isOwner(#id, authentication)")
     @Transactional(propagation = Propagation.REQUIRED)
     public UsersResponse update(Long id,UsersResquest req) {
+        // Quyền đã được kiểm tra trước khi vào hàm. Hibernate theo dõi entity trong transaction;
+        // các field thay đổi được ghi xuống DB khi transaction commit, không phải ngay lúc set(...).
         User updated = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundExcept("Id: "+id+" khong ton tai"));
         if(req.getFullName()!=null) updated.setFullName(req.getFullName());
         if(req.getEmail()!=null) updated.setEmail(req.getEmail());

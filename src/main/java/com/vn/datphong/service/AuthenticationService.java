@@ -30,6 +30,9 @@ public class AuthenticationService {
                 );
 
         // 2. Spring Security xác thực tài khoản và mật khẩu
+        // AuthenticationManager -> DaoAuthenticationProvider -> CustomUserDetailsService -> repository.
+        // Provider kiểm tra trạng thái tài khoản và đối chiếu password bằng PasswordEncoder.
+        // Nếu thất bại sẽ ném exception, không chạy tới bước tạo JWT bên dưới.
         Authentication authentication =
                 authenticationManager.authenticate(authenticationRequest);
 
@@ -38,6 +41,7 @@ public class AuthenticationService {
                 jwtTokenProvider.generateToken(authentication);
 
         // 4. Trả token cho Controller
+        // FE gửi lại token trong Authorization: Bearer <token> ở các API cần đăng nhập.
         return new LoginResponse(accessToken, "Bearer");
     }
 }

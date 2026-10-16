@@ -28,6 +28,8 @@ public final class UserMapper {
                 .build();
     }
     public static UsersResponse toResponse(User e) {
+        // Chuyển entity nội bộ thành DTO chỉ chứa các trường được công bố cho FE.
+        // Không đưa password/secret 2FA vào DTO. Hàm này chưa serialize đối tượng thành JSON.
         Set<RoleResponse> roles = e.getRoles()
                 .stream()
                 .map(role -> RoleResponse.builder()

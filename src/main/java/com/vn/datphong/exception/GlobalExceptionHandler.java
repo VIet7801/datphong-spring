@@ -12,6 +12,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Nhánh trả lỗi của Spring MVC khi controller/service ném exception hoặc validation thất bại.
+ * Lỗi filter trả bằng response.sendError(...) không được tự động bọc bởi advice này.
+ * GlobalExeptionHander hiện cũng xử lý một số exception trùng loại; xem docs/REQUEST_FLOW.md.
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
