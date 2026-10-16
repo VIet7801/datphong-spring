@@ -2,6 +2,7 @@ package com.vn.datphong.controller;
 
 import com.vn.datphong.dto.request.RoomCreateRequest;
 import com.vn.datphong.dto.request.RoomUpdateRequest;
+import com.vn.datphong.dto.response.RoomDetailQuoteResponse;
 import com.vn.datphong.dto.response.RoomResponse;
 import com.vn.datphong.entity.Room;
 import com.vn.datphong.enums.RoomStatus;
@@ -71,6 +72,16 @@ public class RoomController {
     @DeleteMapping("/media/{rooId}/{mediaId}")
     public void deleteMedia(@PathVariable Long rooId, @PathVariable Long mediaId) {
          roomService.deleteMedia(rooId, mediaId);
+    }
+    @GetMapping("/{id}/detail-quote")
+    public ResponseEntity<RoomDetailQuoteResponse> getRoomDetailAndQuote(
+            @PathVariable Long id,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkIn,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkOut,
+            @RequestParam(required = false, defaultValue = "1") Integer guestsCount
+    ) {
+        RoomDetailQuoteResponse response = roomService.getDetailAndQuote(id, checkIn, checkOut, guestsCount);
+        return ResponseEntity.ok(response);
     }
 
 

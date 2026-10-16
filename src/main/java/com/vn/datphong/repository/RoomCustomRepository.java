@@ -5,9 +5,10 @@ import com.vn.datphong.enums.RoomStatus;
 import com.vn.datphong.enums.RoomType;
 import com.vn.datphong.repository.Impl.RoomCustomImpl;
 import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Repository;
 
 import java.util.List;
-
+@Repository
 public interface RoomCustomRepository {
     List<Room> advancedSearch(RoomType type, RoomStatus status, String keyword,
                       Long minPrice, Long maxPrice, Integer minCapacity,

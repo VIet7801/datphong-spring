@@ -8,14 +8,20 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.Optional;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
-    @Query("SELECT COUNT(b) > 0 FROM Booking b WHERE b.room.id = :roomId " +
-            "AND b.checkinDate < :checkoutDate AND b.checkoutDate > :startDate")
-    boolean existsOverlap(@Param("roomId") Long roomId,
-                          @Param("startDate") LocalDate startDate,
-                          @Param("checkoutDate") LocalDate checkoutDate);
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.room.id = :roomId " +
+            "AND b.status IN ('CONFIRMED', 'CHECKED_IN', 'HOLD', 'PENDING_PAYMENT') " +
+            "AND b.checkinDate < :checkOut AND b.checkoutDate > :checkIn")
+    long countOverlappingBookings(
+            @Param("roomId") Long roomId,
+            @Param("checkIn") LocalDate checkIn,
+            @Param("checkOut") LocalDate checkOut
+    );
+
+    Optional<Booking> findByBookingCode(String bookingCode);
 }
 
 

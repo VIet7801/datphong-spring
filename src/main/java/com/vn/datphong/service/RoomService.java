@@ -2,6 +2,7 @@ package com.vn.datphong.service;
 
 import com.vn.datphong.dto.request.RoomCreateRequest;
 import com.vn.datphong.dto.request.RoomUpdateRequest;
+import com.vn.datphong.dto.response.RoomDetailQuoteResponse;
 import com.vn.datphong.dto.response.RoomResponse;
 import com.vn.datphong.entity.Room;
 import com.vn.datphong.enums.RoomStatus;
@@ -24,4 +25,5 @@ public interface RoomService {
     void delete(Long id);
     String uploadMedia(Long roomId, Part file);
     void deleteMedia(Long roomId, Long mediaId);
+    RoomDetailQuoteResponse getDetailAndQuote(Long roomId, LocalDate checkIn, LocalDate checkOut, Integer guestsCount);
 }
