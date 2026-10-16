@@ -2,6 +2,12 @@
 
 Spring Boot API for room booking.
 
+Đọc [luồng request từ FE đến response](docs/REQUEST_FLOW.md) để biết thứ tự xử lý,
+vai trò từng lớp và vị trí đặt breakpoint khi debug đăng nhập hoặc API user.
+
+Xem [báo cáo đối chiếu đặc tả v3.0](docs/SPEC_COMPLIANCE_AUDIT.md) để biết các use case
+đã triển khai một phần, phần còn thiếu và kết quả kiểm chứng ngày 16/10/2026.
+
 ## Requirements
 
 - JDK 17
@@ -69,6 +75,24 @@ The default local configuration uses:
 - PostgreSQL: `jdbc:postgresql://localhost:5435/vivu`
 - Redis: `localhost:6379`
 - MinIO: `http://localhost:9000`
+
+## Account status and existing databases
+
+`UserStatus` contains only `ACTIVE`, `IN_ACTIVE`, and `LOCKED`.
+Login and authenticated API requests require both `active = true` and
+`status = ACTIVE`. A null `active` flag is treated as disabled. Locked or disabled
+accounts cannot use previously issued JWTs while they remain locked or disabled.
+
+Before starting the updated backend against an existing database, run:
+
+```powershell
+Get-Content -Raw scripts/sql/normalize-user-status.sql | docker compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1'
+```
+
+The script converts legacy status names, updates the PostgreSQL check
+constraint, and sets the default for raw SQL inserts to `IN_ACTIVE`.
+It preserves `active` flags, account records, and passwords.
+Hibernate `ddl-auto: update` does not replace this data migration.
 
 ## Maven commands
 
