@@ -4,7 +4,7 @@ import com.vn.datphong.enums.PropertyStatus;
 import lombok.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.LocalTime;
 
 @Data
@@ -31,6 +31,6 @@ public class PropertyResponse {
     private Long cancellationPolicyId;
     private String cancellationPolicyName;
     private Long version;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private Instant createdAt;
+    private Instant updatedAt;
 }

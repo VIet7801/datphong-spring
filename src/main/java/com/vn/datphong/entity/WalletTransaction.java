@@ -1,11 +1,10 @@
 package com.vn.datphong.entity;
 
 import com.vn.datphong.enums.WalletTxType;
+
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -28,8 +27,7 @@ public class WalletTransaction {
     private Wallet wallet;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "tx_type", nullable = false, columnDefinition = "wallet_tx_type")
+    @Column(name = "tx_type", nullable = false)
     private WalletTxType txType;
 
     @Column(nullable = false, precision = 14, scale = 2)

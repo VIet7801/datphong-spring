@@ -1,5 +1,8 @@
 package com.vn.datphong.entity;
 
+import java.time.*;
+import java.util.*;
+
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -10,18 +13,21 @@ import lombok.*;
 @Getter
 @Setter
 @Builder
-public class Role {
+public class Role extends BaseEntity {
 
        @Id
        @GeneratedValue(strategy = GenerationType.IDENTITY)
        private Long id;
 
-       @Column(nullable = false, unique = true, length = 50)
-       private String code;
+    @Column(name = "code", nullable = false, unique = true)
+    private String code;
 
-       @Column(nullable = false, length = 100)
-       private String name;
+    @Column(name = "name", nullable = false)
+    private String name;
 
-       @Column(length = 255)
-       private String description;
+    @Column(name = "description", nullable = true, columnDefinition = "TEXT")
+    private String description;
+
+    @Version
+    private Long version;
 }

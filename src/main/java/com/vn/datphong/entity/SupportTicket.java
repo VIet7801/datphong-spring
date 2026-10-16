@@ -1,13 +1,11 @@
 package com.vn.datphong.entity;
 
-
 import com.vn.datphong.enums.TicketStatusType;
 import com.vn.datphong.enums.TicketTypeEnum;
+
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -38,16 +36,14 @@ public class SupportTicket {
     private User againstUser;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "ticket_type", nullable = false, columnDefinition = "ticket_type_enum")
+    @Column(name = "ticket_type", nullable = false)
     private TicketTypeEnum ticketType;
 
     @Column(columnDefinition = "TEXT")
     private String description;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(nullable = false, columnDefinition = "ticket_status_type")
+    @Column(nullable = false)
     @Builder.Default
     private TicketStatusType status = TicketStatusType.OPEN;
 

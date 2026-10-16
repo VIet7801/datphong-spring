@@ -1,11 +1,10 @@
 package com.vn.datphong.entity;
 
 import com.vn.datphong.enums.EvidenceTypeEnum;
+
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -34,8 +33,7 @@ public class DisputeEvidence {
     private String url;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "evidence_type", nullable = false, columnDefinition = "evidence_type_enum")
+    @Column(name = "evidence_type", nullable = false)
     private EvidenceTypeEnum evidenceType;
 
     @CreationTimestamp

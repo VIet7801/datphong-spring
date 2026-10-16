@@ -1,5 +1,8 @@
 package com.vn.datphong.entity;
 
+import java.time.*;
+import java.util.*;
+
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -29,13 +32,23 @@ public class BookingNight {
     @Column(name = "stay_date", nullable = false)
     private LocalDate stayDate;
 
-    @Column(name = "nightly_rate", nullable = false, precision = 12, scale = 2)
+    @Column(name = "nightly_rate", nullable = false, precision = 19, scale = 2)
     private BigDecimal nightlyRate;
 
-    @Column(nullable = false, length = 5)
+    @Column(name = "currency", nullable = false)
     @Builder.Default
     private String currency = "VND";
 
-    @Column(name = "price_version")
+    @Column(name = "price_version", nullable = false)
     private Long priceVersion;
+
+    @Column(name = "tax_amount", nullable = false, precision = 19, scale = 2)
+    private BigDecimal taxAmount;
+
+    @Column(name = "fee_amount", nullable = false, precision = 19, scale = 2)
+    private BigDecimal feeAmount;
+
+    @org.hibernate.annotations.CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
 }

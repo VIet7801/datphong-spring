@@ -1,12 +1,17 @@
 package com.vn.datphong.entity;
 
+import com.vn.datphong.enums.ActorType;
 import com.vn.datphong.enums.BookingStatusChangeSource;
 import com.vn.datphong.enums.BookingStatusType;
+
+import java.time.*;
+import java.util.*;
+
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Getter
 @Setter
@@ -14,7 +19,9 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "booking_status_history")
+@Table(name = "booking_status_history", uniqueConstraints = {
+    @UniqueConstraint(name = "uq_bookingstatushistory_0", columnNames = {"event_id"})
+})
 public class BookingStatusHistory {
 
     @Id
@@ -26,25 +33,38 @@ public class BookingStatusHistory {
     private Booking booking;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "from_status", length = 30)
+    @Column(name = "from_status", nullable = true)
     private BookingStatusType fromStatus;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "to_status", nullable = false, length = 30)
+    @Column(name = "to_status", nullable = false)
     private BookingStatusType toStatus;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
+    @Column(name = "source", nullable = false)
     private BookingStatusChangeSource source;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "actor_id")
+    @JoinColumn(name = "actor_id", nullable = true)
     private User actor;
 
-    @Column(length = 500)
+    @Column(name = "reason", nullable = true, columnDefinition = "TEXT")
     private String reason;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "actor_type", nullable = false)
+    private ActorType actorType;
+
+    @Column(name = "occurred_at", nullable = false)
+    private Instant occurredAt;
+
+    @Column(name = "correlation_id", nullable = false)
+    private String correlationId;
+
+    @Column(name = "event_id", nullable = false)
+    private UUID eventId;
 }

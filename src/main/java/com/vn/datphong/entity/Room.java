@@ -1,55 +1,59 @@
 package com.vn.datphong.entity;
+
 import com.vn.datphong.enums.RoomStatus;
 import com.vn.datphong.enums.RoomType;
+
+import java.time.*;
+import java.util.*;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
 
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
-@Entity @Table(name = "rooms")
+@Entity @Table(name = "rooms", uniqueConstraints = @UniqueConstraint(columnNames = {"property_id", "room_code"}))
 public class Room extends BaseEntity {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "property_id")
+    @JoinColumn(name = "property_id", nullable = false)
     private Property property;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "room_type_id")
+    @JoinColumn(name = "room_type_id", nullable = false)
     private RoomTypeEntity roomTypeEntity;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_unit_id")
     private RoomUnit roomUnit;
 
-    @Column(nullable = false, length = 20, unique = true)
+    @Column(name = "room_code", nullable = false)
     private String code;
 
-    @Column(nullable = false, length = 150)
+    @Column(name = "name", nullable = true)
     private String name;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(length = 20)
     private RoomType type;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(name = "status", nullable = false)
     @Builder.Default
-    private RoomStatus status = RoomStatus.AVAILABLE;
+    private RoomStatus status = RoomStatus.ACTIVE;
 
-    @Column(nullable = false)
+    @Column
     private Integer capacity;
 
-    @Column(name = "price_per_night", nullable = false)
+    @Column(name = "price_per_night")
     private Long pricePerNight;
 
     @Column(name = "base_price", precision = 12, scale = 2)
     private BigDecimal basePrice;
 
-    @Column(length = 500)
+    @Column(length = 500, columnDefinition = "TEXT")
     private String description;
 
     @Column(name = "image_url", length = 500)
@@ -61,4 +65,10 @@ public class Room extends BaseEntity {
 
     @Version
     private Long version;
+
+    @Column(name = "floor", nullable = true)
+    private String floor;
+
+    @Column(name = "notes", nullable = true, columnDefinition = "TEXT")
+    private String notes;
 }

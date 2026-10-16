@@ -1,12 +1,20 @@
 package com.vn.datphong.entity;
 
+import com.vn.datphong.enums.BookingSourceChannel;
 import com.vn.datphong.enums.BookingStatusType;
+import com.vn.datphong.enums.GuestSegment;
+
+import java.time.*;
+import java.util.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Getter
 @Setter
@@ -21,11 +29,11 @@ public class Booking extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "booking_code", nullable = false, unique = true, length = 20)
+    @Column(name = "booking_code", nullable = false, unique = true)
     private String bookingCode;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "customer_id", nullable = false)
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -33,53 +41,53 @@ public class Booking extends BaseEntity {
     private Room room;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "property_id")
+    @JoinColumn(name = "property_id", nullable = false)
     private Property property;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "room_type_id")
+    @JoinColumn(name = "room_type_id", nullable = false)
     private RoomTypeEntity roomType;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_unit_id")
     private RoomUnit roomUnit;
 
-    @Column(name = "checkin_date", nullable = false)
+    @Column(name = "check_in", nullable = false)
     private LocalDate checkinDate;
 
-    @Column(name = "checkout_date", nullable = false)
+    @Column(name = "check_out", nullable = false)
     private LocalDate checkoutDate;
 
-    @Column(name = "guests_count", nullable = false)
+    @Column(name = "guest_count", nullable = false)
     @Builder.Default
     private Integer guestsCount = 1;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(name = "status", nullable = false)
     @Builder.Default
-    private BookingStatusType status = BookingStatusType.HOLD;
+    private BookingStatusType status = BookingStatusType.PENDING_PAYMENT;
 
-    @Column(name = "hold_expires_at")
-    private LocalDateTime holdExpiresAt;
+    @Transient
+    private Instant holdExpiresAt;
 
-    @Column(name = "expires_at")
-    private LocalDateTime expiresAt;
+    @Column(name = "expires_at", nullable = false)
+    private Instant expiresAt;
 
-    @Column(name = "total_price", nullable = false, precision = 12, scale = 2)
+    @Column(name = "total_amount", nullable = false, precision = 19, scale = 2)
     private BigDecimal totalPrice;
 
-    @Column(nullable = false, length = 5)
+    @Column(name = "currency", nullable = false)
     @Builder.Default
     private String currency = "VND";
 
-    @Column(name = "subtotal_amount", precision = 12, scale = 2)
+    @Column(name = "subtotal_amount", nullable = false, precision = 19, scale = 2)
     private BigDecimal subtotalAmount;
 
-    @Column(name = "tax_amount", precision = 12, scale = 2)
+    @Column(name = "tax_amount", nullable = false, precision = 19, scale = 2)
     @Builder.Default
     private BigDecimal taxAmount = BigDecimal.ZERO;
 
-    @Column(name = "fee_amount", precision = 12, scale = 2)
+    @Column(name = "fee_amount", nullable = false, precision = 19, scale = 2)
     @Builder.Default
     private BigDecimal feeAmount = BigDecimal.ZERO;
 
@@ -97,40 +105,71 @@ public class Booking extends BaseEntity {
     @Column(name = "quote_token", length = 120)
     private String quoteToken;
 
-    @Column(name = "price_version")
+    @Column(name = "price_version", nullable = false)
     private Long priceVersion;
 
-    @Column(name = "cancellation_policy_snapshot", columnDefinition = "TEXT")
-    private String cancellationPolicySnapshot;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "cancellation_policy_snapshot", nullable = false, columnDefinition = "jsonb")
+    private Map<String, Object> cancellationPolicySnapshot;
 
-    @Column(name = "special_request", length = 500)
+    @Column(name = "special_request", nullable = true)
     private String specialRequest;
 
-    @Column(name = "confirmed_at")
-    private LocalDateTime confirmedAt;
+    @Column(name = "confirmed_at", nullable = true)
+    private Instant confirmedAt;
 
-    @Column(name = "cancelled_at")
-    private LocalDateTime cancelledAt;
+    @Column(name = "cancelled_at", nullable = true)
+    private Instant cancelledAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cancelled_by")
+    @JoinColumn(name = "cancelled_by", nullable = true)
     private User cancelledBy;
 
-    @Column(name = "cancellation_reason", length = 500)
+    @Column(name = "cancel_reason", nullable = true)
     private String cancellationReason;
 
-    @Column(name = "cancellation_fee", precision = 12, scale = 2)
+    @Column(name = "cancellation_fee", nullable = true, precision = 19, scale = 2)
     private BigDecimal cancellationFee;
 
-    @Column(name = "refundable_amount", precision = 12, scale = 2)
+    @Column(name = "refundable_amount", nullable = true, precision = 19, scale = 2)
     private BigDecimal refundableAmount;
 
-    @Column(name = "actual_check_in")
-    private LocalDateTime actualCheckIn;
+    @Column(name = "actual_check_in", nullable = true)
+    private Instant actualCheckIn;
 
-    @Column(name = "actual_check_out")
-    private LocalDateTime actualCheckOut;
+    @Column(name = "actual_check_out", nullable = true)
+    private Instant actualCheckOut;
 
     @Version
     private Long version;
+
+    @Column(name = "property_timezone_snapshot", nullable = false)
+    private String propertyTimezoneSnapshot;
+
+    @Column(name = "checkin_local_snapshot", nullable = false)
+    private LocalTime checkinLocalSnapshot;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source_channel", nullable = false)
+    @Builder.Default
+    private BookingSourceChannel sourceChannel = BookingSourceChannel.UNKNOWN;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "guest_segment_snapshot", nullable = false)
+    @Builder.Default
+    private GuestSegment guestSegmentSnapshot = GuestSegment.UNKNOWN;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "checked_in_by_id", nullable = true)
+    private User checkedInBy;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "checked_out_by_id", nullable = true)
+    private User checkedOutBy;
+
+    @Column(name = "checkin_verification_method", nullable = true)
+    private String checkinVerificationMethod;
+
+    /** Legacy response alias; only expires_at is persisted. */
+    public Instant getHoldExpiresAt() { return expiresAt != null ? expiresAt : holdExpiresAt; }
 }

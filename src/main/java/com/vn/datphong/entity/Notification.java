@@ -1,15 +1,16 @@
 package com.vn.datphong.entity;
 
-
 import com.vn.datphong.enums.NotificationChannelType;
 import com.vn.datphong.enums.NotificationTypeEnum;
+
+import java.time.*;
+import java.util.*;
+
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Getter
 @Setter
@@ -17,7 +18,9 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "notifications")
+@Table(name = "notifications", uniqueConstraints = {
+    @UniqueConstraint(name = "uq_notification_0", columnNames = {"event_id", "recipient_id"})
+})
 public class Notification {
 
     @Id
@@ -25,18 +28,17 @@ public class Notification {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "recipient_id", nullable = false)
     private User user;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "notif_type", nullable = false, columnDefinition = "notification_type_enum")
+    @Column(name = "notif_type", nullable = false)
     private NotificationTypeEnum notifType;
 
-    @Column(nullable = false, length = 150)
+    @Column(name = "title", nullable = false)
     private String title;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
 
     @Column(name = "is_read", nullable = false)
@@ -44,12 +46,26 @@ public class Notification {
     private Boolean isRead = false;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(nullable = false, columnDefinition = "notification_channel_type")
+    @Column(nullable = false)
     @Builder.Default
     private NotificationChannelType channel = NotificationChannelType.IN_APP;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
+
+    @Column(name = "event_id", nullable = false)
+    private UUID eventId;
+
+    @Column(name = "event_type", nullable = false)
+    private String eventType;
+
+    @Column(name = "resource_type", nullable = false)
+    private String resourceType;
+
+    @Column(name = "resource_id", nullable = false)
+    private Long resourceId;
+
+    @Column(name = "read_at", nullable = true)
+    private Instant readAt;
 }

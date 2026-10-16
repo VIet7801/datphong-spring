@@ -1,11 +1,10 @@
 package com.vn.datphong.entity;
 
 import com.vn.datphong.enums.OtpPurposeType;
+
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -33,8 +32,7 @@ public class OtpVerification {
     private String otpCode;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(nullable = false, columnDefinition = "otp_purpose_type")
+    @Column(nullable = false)
     private OtpPurposeType purpose;
 
     @Column(name = "expires_at", nullable = false)

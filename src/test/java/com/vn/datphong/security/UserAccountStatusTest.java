@@ -108,6 +108,7 @@ class UserAccountStatusTest {
     static Stream<Arguments> deniedStates() {
         return Stream.of(
                 Arguments.of(UserStatus.IN_ACTIVE, true),
+                Arguments.of(UserStatus.PENDING_VERIFICATION, true),
                 Arguments.of(UserStatus.LOCKED, true),
                 Arguments.of(UserStatus.ACTIVE, false),
                 Arguments.of(UserStatus.ACTIVE, null),
@@ -165,8 +166,8 @@ class UserAccountStatusTest {
     }
 
     @Test
-    void enumContainsOnlyTheThreeSupportedStatuses() {
-        assertArrayEquals(new UserStatus[]{UserStatus.ACTIVE, UserStatus.IN_ACTIVE, UserStatus.LOCKED},
+    void enumContainsTheFourCatalogStatuses() {
+        assertArrayEquals(new UserStatus[]{UserStatus.ACTIVE, UserStatus.IN_ACTIVE, UserStatus.LOCKED, UserStatus.PENDING_VERIFICATION},
                 UserStatus.values());
     }
 }

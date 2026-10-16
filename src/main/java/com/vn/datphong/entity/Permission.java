@@ -1,5 +1,8 @@
 package com.vn.datphong.entity;
 
+import java.time.*;
+import java.util.*;
+
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -10,19 +13,22 @@ import lombok.*;
 @Builder
 @Entity
 @Table(name = "permissions")
-public class Permission {
+public class Permission extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     // 'room.approve', 'ticket.resolve', 'settings.update'...
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(name = "code", nullable = false, unique = true)
     private String code;
 
-    @Column(nullable = false, length = 150)
+    @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(length = 255)
+    @Column(name = "description", nullable = true, columnDefinition = "TEXT")
     private String description;
+
+    @Version
+    private Long version;
 }

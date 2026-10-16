@@ -1,10 +1,9 @@
 package com.vn.datphong.entity;
 
 import com.vn.datphong.enums.VipSubStatusType;
+
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDate;
 
@@ -36,8 +35,7 @@ public class HostVipSubscription {
     private LocalDate endDate;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(nullable = false, columnDefinition = "vip_sub_status_type")
+    @Column(nullable = false)
     @Builder.Default
     private VipSubStatusType status = VipSubStatusType.ACTIVE;
 

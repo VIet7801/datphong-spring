@@ -8,7 +8,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Data
@@ -40,7 +40,7 @@ public class RoomResponse {
     /** Toàn bộ media (ảnh + video) kèm id — dùng cho màn quản lý để xoá từng item. */
     private List<RoomMediaItem> media;
     private Boolean active;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private Instant createdAt;
+    private Instant updatedAt;
 
 }

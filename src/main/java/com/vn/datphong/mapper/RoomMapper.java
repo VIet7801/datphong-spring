@@ -19,7 +19,7 @@ public final class RoomMapper {
                 .code(req.getCode())
                 .name(req.getName())
                 .type(req.getType())
-                .status(req.getStatus() != null ? req.getStatus() : RoomStatus.AVAILABLE)
+                .status(req.getStatus() != null ? req.getStatus() : RoomStatus.ACTIVE)
                 .capacity(req.getCapacity())
                 .pricePerNight(req.getPricePerNight())
                 .basePrice(req.getPricePerNight() != null ? java.math.BigDecimal.valueOf(req.getPricePerNight()) : null)

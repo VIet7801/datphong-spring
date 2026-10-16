@@ -1,7 +1,7 @@
 package com.vn.datphong.entity;
 
-
 import com.vn.datphong.enums.HostStatus;
+
 import jakarta.persistence.*;
 import lombok.*;
 

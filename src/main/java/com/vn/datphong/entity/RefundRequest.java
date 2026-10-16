@@ -2,11 +2,10 @@ package com.vn.datphong.entity;
 
 import com.vn.datphong.enums.RefundDestinationType;
 import com.vn.datphong.enums.RefundStatusType;
+
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -43,13 +42,11 @@ public class RefundRequest {
     private String reason;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "refund_destination", nullable = false, columnDefinition = "refund_destination_type")
+    @Column(name = "refund_destination", nullable = false)
     private RefundDestinationType refundDestination;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(nullable = false, columnDefinition = "refund_status_type")
+    @Column(nullable = false)
     @Builder.Default
     private RefundStatusType status = RefundStatusType.PENDING;
 
@@ -73,7 +70,7 @@ public class RefundRequest {
     @Column(name = "failure_code", length = 80)
     private String failureCode;
 
-    @Column(name = "failure_message", length = 500)
+    @Column(name = "failure_message", length = 500, columnDefinition = "TEXT")
     private String failureMessage;
 
     @Version

@@ -1,6 +1,7 @@
 package com.vn.datphong.entity;
 
 import com.vn.datphong.enums.CohostStatusType;
+
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -38,8 +39,7 @@ public class CoHost {
     private Map<String, Object> permissions = Map.of();
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(nullable = false, columnDefinition = "cohost_status_type")
+    @Column(nullable = false)
     @Builder.Default
     private CohostStatusType status = CohostStatusType.PENDING;
 

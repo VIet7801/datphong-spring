@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 @NoArgsConstructor
@@ -37,7 +37,7 @@ public class BookingResponse {
     private Integer guestsCount;
 
     private BookingStatusType status;
-    private LocalDateTime holdExpiresAt;
+    private Instant holdExpiresAt;
 
     private BigDecimal totalPrice;
     private BigDecimal subtotalAmount;
@@ -51,14 +51,14 @@ public class BookingResponse {
     private String quoteToken;
     private Long priceVersion;
     private String specialRequest;
-    private LocalDateTime confirmedAt;
-    private LocalDateTime cancelledAt;
+    private Instant confirmedAt;
+    private Instant cancelledAt;
     private String cancellationReason;
     private BigDecimal cancellationFee;
     private BigDecimal refundableAmount;
-    private LocalDateTime actualCheckIn;
-    private LocalDateTime actualCheckOut;
+    private Instant actualCheckIn;
+    private Instant actualCheckOut;
 
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private Instant createdAt;
+    private Instant updatedAt;
 }

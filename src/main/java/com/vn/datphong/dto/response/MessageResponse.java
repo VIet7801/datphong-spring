@@ -7,7 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 @NoArgsConstructor
@@ -19,6 +19,6 @@ public class MessageResponse {
     private User sender;
     private MessageTypeEnum msgType;
     private String content;
-    private LocalDateTime readAt;
-    private LocalDateTime createdAt;
+    private Instant readAt;
+    private Instant createdAt;
 }

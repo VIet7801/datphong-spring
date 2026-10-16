@@ -215,7 +215,7 @@ public class RoomServiceImp implements RoomService {
     public RoomDetailQuoteResponse getDetailAndQuote(Long roomId, LocalDate checkIn, LocalDate checkOut, Integer guestsCount) {
         Room room = roomRepository.findById(roomId)
                 .orElseThrow(() -> new ResourceNotFoundExcept("Không tìm thấy phòng với ID: " + roomId));
-        if (Boolean.FALSE.equals(room.getActive()) || room.getStatus() != RoomStatus.AVAILABLE) {
+        if (Boolean.FALSE.equals(room.getActive()) || (room.getStatus() != RoomStatus.ACTIVE && room.getStatus() != RoomStatus.AVAILABLE)) {
             throw new BusinessException(400, "Phòng hiện không hiển thị công khai hoặc đang bảo trì.");
         }
         List<RoomMediaItem> mediaItems = loadMedia(roomId);
@@ -232,7 +232,10 @@ public class RoomServiceImp implements RoomService {
             throw new BusinessException(400, "Số lượng khách vượt quá sức chứa tối đa của phòng (" + room.getCapacity() + " người).");
         }
         int nights = (int) ChronoUnit.DAYS.between(checkIn, checkOut);
-        List<RoomRate> rates = roomRateRepository.findRatesByRoomAndDateRange(roomId, checkIn, checkOut);
+        if (room.getRoomTypeEntity() == null) {
+            throw new BusinessException("Phòng chưa được gắn loại phòng để xác định bảng giá.");
+        }
+        List<RoomRate> rates = roomRateRepository.findRatesByRoomAndDateRange(room.getRoomTypeEntity().getId(), checkIn, checkOut);
         if (rates.isEmpty() || rates.size() < nights) {
             throw new BusinessException( "Chưa cấu hình đầy đủ đơn giá phòng (nightly rate) cho toàn bộ khoảng thời gian lưu trú.");
         }

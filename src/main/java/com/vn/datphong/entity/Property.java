@@ -1,6 +1,10 @@
 package com.vn.datphong.entity;
 
 import com.vn.datphong.enums.PropertyStatus;
+
+import java.time.*;
+import java.util.*;
+
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -24,51 +28,51 @@ public class Property extends BaseEntity {
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
 
-    @Column(nullable = false, length = 180)
+    @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(nullable = false, unique = true, length = 220)
+    @Column(name = "slug", nullable = true, unique = true)
     private String slug;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "description", nullable = true, columnDefinition = "TEXT")
     private String description;
 
-    @Column(nullable = false, length = 255)
+    @Column(name = "address", nullable = false)
     private String addressLine;
 
-    @Column(nullable = false, length = 100)
+    @Column(name = "city", nullable = false)
     private String city;
 
-    @Column(nullable = false, length = 100)
+    @Column(name = "country", nullable = true)
     @Builder.Default
     private String country = "VN";
 
-    @Column(precision = 10, scale = 7)
+    @Column(name = "latitude", nullable = true, precision = 19, scale = 2)
     private BigDecimal latitude;
 
-    @Column(precision = 10, scale = 7)
+    @Column(name = "longitude", nullable = true, precision = 19, scale = 2)
     private BigDecimal longitude;
 
-    @Column(nullable = false, length = 64)
+    @Column(name = "timezone", nullable = false)
     @Builder.Default
     private String timezone = "Asia/Bangkok";
 
-    @Column(name = "check_in_from")
+    @Column(name = "checkin_local", nullable = false)
     private LocalTime checkInFrom;
 
-    @Column(name = "check_out_until")
+    @Column(name = "checkout_local", nullable = false)
     private LocalTime checkOutUntil;
 
-    @Column(name = "public_contact", length = 255)
+    @Column(name = "public_contact", nullable = true)
     private String publicContact;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
+    @Column(name = "status", nullable = false)
     @Builder.Default
     private PropertyStatus status = PropertyStatus.DRAFT;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cancellation_policy_id")
+    @JoinColumn(name = "cancellation_policy_id", nullable = true)
     private CancellationPolicy cancellationPolicy;
 
     @Version

@@ -5,7 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 @NoArgsConstructor
@@ -25,7 +25,7 @@ public class ConversationResponse {
 
     /** Nội dung tin nhắn cuối cùng, để hiển thị preview trong danh sách hội thoại. */
     private String lastMessagePreview;
-    private LocalDateTime lastMessageAt;
+    private Instant lastMessageAt;
 
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 }

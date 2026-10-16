@@ -55,6 +55,33 @@ Reset local database, Redis, and MinIO data:
 docker compose down -v
 ```
 
+## Khởi tạo DB bằng một lệnh trên Windows
+
+Sau khi pull code, mở terminal tại thư mục có `pom.xml` và chạy:
+
+```powershell
+.\khoi-tao-db.cmd
+```
+
+Cần cài JDK 17 trở lên. Nếu chưa có PostgreSQL đang chạy tại `localhost:5435`,
+hãy cài và mở Docker Desktop; script sẽ tự khởi động dịch vụ `postgres` trong
+Docker Compose. JDBC được tải tự động bằng Maven Wrapper ở lần chạy đầu.
+
+Script tạo database nếu chưa tồn tại, tự chọn `V000 → V002` cho DB chưa có bảng
+hoặc `V001 → V002` cho DB cũ chưa có dữ liệu. Hai tệp SQL chạy trong cùng một giao dịch;
+lỗi ở bất kỳ bước nào sẽ hoàn tác thay đổi cấu trúc. Kết quả là 74 bảng rỗng.
+Lịch sử khởi tạo được lưu trong schema kỹ thuật `datphong_schema`, tách khỏi 74 bảng
+nghiệp vụ ở `public`. Chạy lại sẽ nhận biết phiên bản đã áp dụng và bỏ qua SQL.
+DB có dữ liệu nhưng chưa có lịch sử này sẽ bị từ chối, không bị xóa để tạo lại.
+V001 dành cho cấu trúc DB cũ đã rà soát; với máy mới nên bắt đầu bằng database chưa có bảng.
+
+Thông tin kết nối lấy từ `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`,
+`SPRING_DATASOURCE_PASSWORD` hoặc mặc định trong `src/main/resources/application.yaml`.
+Tài khoản cần quyền tạo bảng và extension `btree_gist`; nếu database chưa tồn tại
+thì cần thêm quyền `CREATEDB`. Cấu hình Docker mặc định đã đáp ứng các quyền này.
+
+Chi tiết và cách chỉ định JDK/JDBC: [hướng dẫn khởi tạo schema](docs/ENTITY_SCHEMA_INITIALIZATION.md).
+
 ## Run from an IDE
 
 Start only the dependencies:
@@ -129,6 +156,7 @@ After that, your teammate can clone and run:
 git clone https://github.com/<your-username>/<repo-name>.git
 cd <repo-name>
 Copy-Item .env.example .env
+.\khoi-tao-db.cmd
 docker compose up -d
 ```
 

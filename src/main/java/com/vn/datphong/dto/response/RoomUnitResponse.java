@@ -3,7 +3,7 @@ package com.vn.datphong.dto.response;
 import com.vn.datphong.enums.RoomUnitStatus;
 import lombok.*;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 @NoArgsConstructor
@@ -20,6 +20,6 @@ public class RoomUnitResponse {
     private String floor;
     private String notes;
     private Long version;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private Instant createdAt;
+    private Instant updatedAt;
 }

@@ -1,6 +1,6 @@
 # Đối chiếu dự án với đặc tả hệ thống đặt phòng v3.0
 
-Ngày kiểm tra: 16/10/2026. Nguồn: [Dac_ta_he_thong_dat_phong_spring.pdf](../Dac_ta_he_thong_dat_phong_spring.pdf), 51 trang, 36 use case.
+Ngày kiểm tra: 16/10/2026. Nguồn: [Dac_ta_he_thong_dat_phong_spring.pdf](Dac_ta_he_thong_dat_phong_spring.pdf), 51 trang, 36 use case.
 Các số trang dưới đây là số trang ghi trong PDF. Đánh giá áp dụng cho working tree tại lúc kiểm tra, không chỉ commit HEAD.
 
 ## 1. Kết luận

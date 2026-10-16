@@ -1,10 +1,9 @@
 package com.vn.datphong.entity;
 
 import com.vn.datphong.enums.WalletOwnerType;
+
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 
@@ -26,8 +25,7 @@ public class Wallet {
     private Long ownerId;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "owner_type", nullable = false, columnDefinition = "wallet_owner_type")
+    @Column(name = "owner_type", nullable = false)
     private WalletOwnerType ownerType;
 
     @Column(nullable = false, precision = 14, scale = 2)

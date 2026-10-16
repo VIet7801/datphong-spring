@@ -1,2 +1,4 @@
 /mvnw text eol=lf
 *.cmd text eol=crlf
+/scripts/sql/V*.sql text eol=lf
+/scripts/sql/checksums.sha256 text eol=lf

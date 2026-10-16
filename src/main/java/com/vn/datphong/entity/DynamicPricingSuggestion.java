@@ -31,7 +31,7 @@ public class DynamicPricingSuggestion {
     @Column(name = "suggested_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal suggestedPrice;
 
-    @Column(length = 255)
+    @Column(length = 255, columnDefinition = "TEXT")
     private String reason;
 
     @Column(name = "model_version", length = 30)

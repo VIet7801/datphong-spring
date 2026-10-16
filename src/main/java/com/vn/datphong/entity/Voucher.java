@@ -1,13 +1,11 @@
 package com.vn.datphong.entity;
 
-
 import com.vn.datphong.enums.DiscountTypeEnum;
 import com.vn.datphong.enums.VoucherOwnerType;
+
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -29,8 +27,7 @@ public class Voucher {
     private String code;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "owner_type", nullable = false, columnDefinition = "voucher_owner_type")
+    @Column(name = "owner_type", nullable = false)
     private VoucherOwnerType ownerType=VoucherOwnerType.HOST;
 
     // Nếu owner_type = HOST thì đây là host_id, nếu SYSTEM thì có thể null
@@ -39,8 +36,7 @@ public class Voucher {
     private User owner;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(name = "discount_type", nullable = false, columnDefinition = "discount_type_enum")
+    @Column(name = "discount_type", nullable = false)
     private DiscountTypeEnum discountType;
 
     @Column(name = "discount_value", nullable = false, precision = 12, scale = 2)

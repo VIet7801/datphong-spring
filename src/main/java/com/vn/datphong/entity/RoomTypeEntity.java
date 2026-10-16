@@ -1,5 +1,8 @@
 package com.vn.datphong.entity;
 
+import java.time.*;
+import java.util.*;
+
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -23,35 +26,40 @@ public class RoomTypeEntity extends BaseEntity {
     @JoinColumn(name = "property_id", nullable = false)
     private Property property;
 
-    @Column(nullable = false, length = 50)
+    @Column(name = "code", nullable = false)
     private String code;
 
-    @Column(nullable = false, length = 150)
+    @Column(name = "name", nullable = false)
     private String name;
 
     @Column(name = "max_guests", nullable = false)
     private Integer maxGuests;
 
-    @Column(name = "max_adults")
+    @Column(name = "max_adults", nullable = true)
     private Integer maxAdults;
 
-    @Column(name = "max_children")
+    @Column(name = "max_children", nullable = true)
     private Integer maxChildren;
 
-    @Column(name = "bed_type", length = 100)
+    @Column(name = "bed_type", nullable = false)
     private String bedType;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "description", nullable = true, columnDefinition = "TEXT")
     private String description;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cancellation_policy_id")
+    @JoinColumn(name = "cancellation_policy_id", nullable = true)
     private CancellationPolicy cancellationPolicy;
 
-    @Column(name = "is_active", nullable = false)
+    @Column(name = "active", nullable = false)
     @Builder.Default
     private Boolean active = true;
 
     @Version
     private Long version;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "room_type_amenities", joinColumns = @JoinColumn(name = "room_type_id"), inverseJoinColumns = @JoinColumn(name = "amenity_id"))
+    @Builder.Default
+    private Set<Amenity> amenities = new HashSet<>();
 }

@@ -26,7 +26,7 @@ public class SystemSetting {
     @Column(name = "setting_value", nullable = false, length = 255)
     private String settingValue;
 
-    @Column(length = 255)
+    @Column(length = 255, columnDefinition = "TEXT")
     private String description;
 
     @ManyToOne(fetch = FetchType.LAZY)

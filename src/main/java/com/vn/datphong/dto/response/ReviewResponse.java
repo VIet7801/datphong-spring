@@ -8,7 +8,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Data
@@ -34,7 +34,7 @@ public class ReviewResponse {
     /** Ảnh/video đính kèm review (MinIO url). */
     private List<MediaItem> media;
 
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @Data
     @NoArgsConstructor

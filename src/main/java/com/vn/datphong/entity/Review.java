@@ -1,11 +1,14 @@
 package com.vn.datphong.entity;
 
 import com.vn.datphong.enums.ReviewStatusType;
+
+import java.time.*;
+import java.util.*;
+
 import jakarta.persistence.*;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Getter
 @Setter
@@ -14,7 +17,7 @@ import java.time.LocalDateTime;
 @Builder
 @Entity
 @Table(name = "reviews")
-public class Review {
+public class Review extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,11 +25,11 @@ public class Review {
 
     // Chỉ cho phép đánh giá sau khi booking đã "completed" - kiểm tra ở tầng service
     @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "booking_id", nullable = false, unique = true)
+    @JoinColumn(name = "booking_id", nullable = false)
     private Booking booking;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "customer_id", nullable = false)
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -34,21 +37,40 @@ public class Review {
     private Room room;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "property_id")
+    @JoinColumn(name = "property_id", nullable = false)
     private Property property;
 
-    @Column(nullable = false)
+    @Column(name = "rating", nullable = false)
     private Short rating;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String comment;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
+    @Column(name = "status", nullable = false)
     @Builder.Default
-    private ReviewStatusType status = ReviewStatusType.VISIBLE;
+    private ReviewStatusType status = ReviewStatusType.PUBLISHED;
 
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    @Column(name = "host_reply", nullable = true)
+    private String hostReply;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "host_replied_by_id", nullable = true)
+    private User hostRepliedBy;
+
+    @Column(name = "host_replied_at", nullable = true)
+    private Instant hostRepliedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "moderated_by_id", nullable = true)
+    private User moderatedBy;
+
+    @Column(name = "moderated_at", nullable = true)
+    private Instant moderatedAt;
+
+    @Column(name = "moderation_reason", nullable = true)
+    private String moderationReason;
+
+    @Version
+    private Long version;
 }

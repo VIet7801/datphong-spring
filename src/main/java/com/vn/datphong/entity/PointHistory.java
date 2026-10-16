@@ -30,7 +30,7 @@ public class PointHistory {
     @Column(name = "points_change", nullable = false)
     private Integer pointsChange;
 
-    @Column(length = 100)
+    @Column(length = 100, columnDefinition = "TEXT")
     private String reason;
 
     @CreationTimestamp

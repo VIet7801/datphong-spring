@@ -2,7 +2,7 @@ package com.vn.datphong.dto.response;
 
 import lombok.*;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @Data
 @NoArgsConstructor
@@ -23,6 +23,6 @@ public class RoomTypeResponse {
     private String cancellationPolicyName;
     private Boolean active;
     private Long version;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private Instant createdAt;
+    private Instant updatedAt;
 }

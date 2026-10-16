@@ -1,11 +1,10 @@
 package com.vn.datphong.entity;
 
 import com.vn.datphong.enums.WithdrawalStatusType;
+
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -40,8 +39,7 @@ public class WithdrawalRequest {
     private String bankAccountName;
 
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
-    @Column(nullable = false, columnDefinition = "withdrawal_status_type")
+    @Column(nullable = false)
     @Builder.Default
     private WithdrawalStatusType status = WithdrawalStatusType.PENDING;
 

@@ -1,6 +1,7 @@
 package com.vn.datphong.entity;
 
 import com.vn.datphong.enums.RankNameType;
+
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -21,7 +22,6 @@ public class LoyaltyRank {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
 
     @Enumerated(EnumType.STRING)
     @Column(name = "name", nullable = false, unique = true, length = 30)

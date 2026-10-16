@@ -1,5 +1,8 @@
 package com.vn.datphong.entity;
 
+import java.time.*;
+import java.util.*;
+
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -14,7 +17,7 @@ import java.time.LocalDate;
 @Entity
 @Table(
         name = "room_rates",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"room_type_id", "stay_date"})
+        uniqueConstraints = @UniqueConstraint(columnNames = {"room_type_id", "stay_date", "currency"})
 )
 public class RoomRate extends BaseEntity {
 
@@ -29,10 +32,10 @@ public class RoomRate extends BaseEntity {
     @Column(name = "stay_date", nullable = false)
     private LocalDate stayDate;
 
-    @Column(name = "nightly_rate", nullable = false, precision = 12, scale = 2)
+    @Column(name = "amount", nullable = false, precision = 19, scale = 2)
     private BigDecimal nightlyRate;
 
-    @Column(nullable = false, length = 5)
+    @Column(name = "currency", nullable = false)
     @Builder.Default
     private String currency = "VND";
 
@@ -43,4 +46,7 @@ public class RoomRate extends BaseEntity {
     @Column(name = "price_version", nullable = false)
     @Builder.Default
     private Long priceVersion = 1L;
+
+    @Version
+    private Long version;
 }
