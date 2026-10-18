@@ -5,8 +5,8 @@ Spring Boot API for room booking.
 Đọc [luồng request từ FE đến response](docs/REQUEST_FLOW.md) để biết thứ tự xử lý,
 vai trò từng lớp và vị trí đặt breakpoint khi debug đăng nhập hoặc API user.
 
-Xem [báo cáo đối chiếu đặc tả v3.0](docs/SPEC_COMPLIANCE_AUDIT.md) để biết các use case
-đã triển khai một phần, phần còn thiếu và kết quả kiểm chứng ngày 16/10/2026.
+Xem [báo cáo đối chiếu toàn dự án với đặc tả v3.0](docs/PROJECT_SPEC_AUDIT.md) để biết
+trạng thái đủ 36 use case, lỗi cần ưu tiên và kết quả kiểm chứng ngày 16/10/2026.
 
 ## Requirements
 

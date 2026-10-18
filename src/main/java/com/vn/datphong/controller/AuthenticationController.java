@@ -4,6 +4,7 @@ import com.vn.datphong.dto.request.LoginRequest;
 import com.vn.datphong.dto.response.ApiResponse;
 import com.vn.datphong.dto.response.LoginResponse;
 import com.vn.datphong.service.AuthenticationService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ public class AuthenticationController {
     private final AuthenticationService authenticationService;
 
     @PostMapping("/login")
+    @SecurityRequirements
     public ResponseEntity<ApiResponse<LoginResponse>> login(
             @Valid @RequestBody LoginRequest request
     ) {

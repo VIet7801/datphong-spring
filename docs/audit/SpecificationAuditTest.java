@@ -1,17 +1,25 @@
-// Audit probes: expected behavior from specification v3.0, not production code.
-// Kept outside src/test because these tests intentionally expose unresolved defects.
+// Probe đối chiếu hành vi theo đặc tả v3.0, không phải code sản phẩm.
+// Giữ ngoài src/test vì các assertion này chủ động phơi bày thiếu sót chưa xử lý.
 package com.vn.datphong.audit;
 
 import com.vn.datphong.config.SecurityConfig;
 import com.vn.datphong.controller.RoomController;
+import com.vn.datphong.dto.request.RoomCreateRequest;
 import com.vn.datphong.dto.request.RoomUpdateRequest;
 import com.vn.datphong.dto.request.UsersResquest;
 import com.vn.datphong.dto.response.RoomResponse;
 import com.vn.datphong.entity.Room;
+import com.vn.datphong.entity.RoomRate;
+import com.vn.datphong.entity.RoomTypeEntity;
+import com.vn.datphong.entity.Property;
 import com.vn.datphong.entity.User;
+import com.vn.datphong.enums.RoomStatus;
+import com.vn.datphong.enums.PropertyStatus;
+import com.vn.datphong.exception.BusinessException;
 import com.vn.datphong.exception.GlobalExceptionHandler;
 import com.vn.datphong.repository.RoomImageRepository;
 import com.vn.datphong.repository.RoomRepository;
+import com.vn.datphong.repository.RoomRateRepository;
 import com.vn.datphong.repository.UserRepository;
 import com.vn.datphong.security.JwtTokenProvider;
 import com.vn.datphong.service.Impl.CustomUserDetailsService;
@@ -39,6 +47,7 @@ import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
 import java.io.ByteArrayInputStream;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Base64;
 import java.util.List;
@@ -105,7 +114,7 @@ class SpecificationAuditTest {
         when(rooms.findById(1L)).thenReturn(Optional.of(room));
         when(rooms.save(any())).thenAnswer(call -> call.getArgument(0));
         when(images.findByRoomIdOrdered(1L)).thenReturn(List.of());
-        RoomServiceImp service = new RoomServiceImp(rooms, mock(MinioService.class), images);
+        RoomServiceImp service = new RoomServiceImp(rooms, mock(MinioService.class), images, mock(RoomRateRepository.class));
 
         RoomResponse result = service.update(1L, RoomUpdateRequest.builder().name("Updated name").build());
 
@@ -144,7 +153,7 @@ class SpecificationAuditTest {
         when(part.getContentType()).thenReturn("image/png");
         when(part.getSize()).thenReturn((long) png.length);
         when(part.getInputStream()).thenReturn(new ByteArrayInputStream(png));
-        RoomServiceImp service = new RoomServiceImp(rooms, minio, images);
+        RoomServiceImp service = new RoomServiceImp(rooms, minio, images, mock(RoomRateRepository.class));
 
         service.uploadMedia(1L, part);
 
@@ -165,5 +174,72 @@ class SpecificationAuditTest {
         verify(roomService).uploadMedia(eq(1L), captured.capture());
         assertNotNull(captured.getValue(), "Multipart file must bind to a non-null Part");
         assertEquals("image.png", captured.getValue().getSubmittedFileName());
+    }
+
+    @Test
+    void uc05CreatedRoomHasRequiredPropertyAndRoomTypeRelations() {
+        RoomRepository rooms = mock(RoomRepository.class);
+        when(rooms.save(any())).thenAnswer(call -> call.getArgument(0));
+        RoomServiceImp service = new RoomServiceImp(rooms, mock(MinioService.class),
+                mock(RoomImageRepository.class), mock(RoomRateRepository.class));
+        service.create(RoomCreateRequest.builder().propertyId(10L).roomTypeId(20L).code("AUDIT-FK").build());
+        ArgumentCaptor<Room> captured = ArgumentCaptor.forClass(Room.class);
+        verify(rooms).save(captured.capture());
+        assertAll(
+                () -> assertNotNull(captured.getValue().getProperty(), "Phòng phải được gắn property hợp lệ"),
+                () -> assertNotNull(captured.getValue().getRoomTypeEntity(), "Phòng phải được gắn loại phòng hợp lệ"));
+    }
+
+    @Test
+    void uc08DraftPropertyCannotBeShownAsPublicRoomDetail() {
+        Room room = quoteRoom();
+        room.getProperty().setStatus(PropertyStatus.DRAFT);
+        RoomServiceImp service = quoteService(room, mock(RoomRateRepository.class));
+        assertThrows(BusinessException.class, () -> service.getDetailAndQuote(1L, null, null, 1));
+    }
+
+    @Test
+    void uc08QuoteRejectsZeroGuests() {
+        RoomRateRepository rates = mock(RoomRateRepository.class);
+        LocalDate from = LocalDate.now().plusDays(10);
+        when(rates.findRatesByRoomAndDateRange(20L, from, from.plusDays(1)))
+                .thenReturn(List.of(RoomRate.builder().stayDate(from).nightlyRate(new BigDecimal("100000")).build()));
+        RoomServiceImp service = quoteService(quoteRoom(), rates);
+        assertThrows(BusinessException.class, () -> service.getDetailAndQuote(1L, from, from.plusDays(1), 0));
+    }
+
+    @Test
+    void uc08QuoteRejectsAnIncompleteDatePair() {
+        RoomServiceImp service = quoteService(quoteRoom(), mock(RoomRateRepository.class));
+        assertThrows(BusinessException.class,
+                () -> service.getDetailAndQuote(1L, LocalDate.now().plusDays(10), null, 1));
+    }
+
+    @Test
+    void uc08QuoteSumsEachNightAndUsesRoomTypeWithHalfOpenDateRange() {
+        RoomRateRepository rates = mock(RoomRateRepository.class);
+        LocalDate from = LocalDate.now().plusDays(10);
+        when(rates.findRatesByRoomAndDateRange(20L, from, from.plusDays(3))).thenReturn(List.of(
+                RoomRate.builder().stayDate(from).nightlyRate(new BigDecimal("100000")).build(),
+                RoomRate.builder().stayDate(from.plusDays(1)).nightlyRate(new BigDecimal("150000")).build(),
+                RoomRate.builder().stayDate(from.plusDays(2)).nightlyRate(new BigDecimal("200000")).build()));
+        var quote = quoteService(quoteRoom(), rates).getDetailAndQuote(1L, from, from.plusDays(3), 2);
+        assertEquals(0, new BigDecimal("450000").compareTo(quote.getSubTotal()));
+        assertEquals(3, quote.getNumberOfNights());
+        verify(rates).findRatesByRoomAndDateRange(20L, from, from.plusDays(3));
+    }
+
+    private Room quoteRoom() {
+        return Room.builder().id(1L).active(true).status(RoomStatus.ACTIVE).capacity(2)
+                .property(Property.builder().id(10L).status(PropertyStatus.PUBLISHED).build())
+                .roomTypeEntity(RoomTypeEntity.builder().id(20L).maxGuests(2).active(true).build()).build();
+    }
+
+    private RoomServiceImp quoteService(Room room, RoomRateRepository rates) {
+        RoomRepository rooms = mock(RoomRepository.class);
+        when(rooms.findById(1L)).thenReturn(Optional.of(room));
+        RoomImageRepository images = mock(RoomImageRepository.class);
+        when(images.findByRoomIdOrdered(1L)).thenReturn(List.of());
+        return new RoomServiceImp(rooms, mock(MinioService.class), images, rates);
     }
 }

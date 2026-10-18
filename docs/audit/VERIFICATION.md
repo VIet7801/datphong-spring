@@ -1,73 +1,109 @@
-# Minh chứng kiểm tra đặc tả - 16/10/2026
+# Minh chứng rà soát toàn dự án — 16/10/2026
 
-Đọc cùng [báo cáo đối chiếu](../SPEC_COMPLIANCE_AUDIT.md).
+Đọc cùng [PROJECT_SPEC_AUDIT.md](../PROJECT_SPEC_AUDIT.md). Các kết quả bên dưới thay thế số liệu của lượt kiểm tra cũ. Nguồn yêu cầu là PDF nghiệp vụ v3.0, 51 trang, 36 use case.
 
-## 1. Kiểm tra đã thực hiện
+## 1. Kết quả kiểm thử hiện tại
 
-| Kiểm tra | Kết quả | Phạm vi bằng chứng |
+| Bộ kiểm tra | Kết quả | Phạm vi bằng chứng |
 |---|---|---|
-| UserAccountStatusTest | 14 test đạt, 0 failure/error | Login với BCrypt, JWT ký thực; ACTIVE/IN_ACTIVE/LOCKED, active=false/null, status=null, user bị xóa, ADMIN bị khóa; repository giả |
-| UC-01: create user phải hash password | Không đạt | Giá trị truyền vào repository vẫn bằng chuỗi password test |
-| UC-05: CUSTOMER không được tạo phòng | Không đạt | MockMvc + filter chain thật: dự kiến 403, thực tế 201; service persistence giả |
-| UC-05: đổi tên phòng phải đổi entity/response | Không đạt | Dự kiến Updated name, thực tế Original name; repository giả |
-| UC-06: upload phải lưu metadata | Không đạt | Không gọi RoomImageRepository.save; MinIO/repository giả |
-| UC-07: khách chưa đăng nhập được search | Không đạt | MockMvc + filter chain thật: dự kiến 200, thực tế 401 |
-| UC-06: nhận multipart Servlet Part | Đạt | MockPart nhận HTTP 201, Part không null và đúng tên file tại service; không kiểm tra upload object thật |
+| DatphongApplicationTests | 1 đạt | Spring context khởi động với ddl-auto=validate, không tự sửa schema |
+| UserAccountStatusTest | 16 đạt | BCrypt login, JWT ký thực, ACTIVE/IN_ACTIVE/LOCKED/PENDING_VERIFICATION, active=false/null, status=null, user đã xóa và ADMIN bị khóa. Repository giả |
+| EntitySchemaTest trong lượt mặc định | 2 đạt, 3 bỏ qua | Bootstrap metadata 74 entity, xuất DDL ra file, kiểm tra StayRange. Ba test bật bằng DATPHONG_SCHEMA_VALIDATE không chạy trong lượt mặc định |
+| EntitySchemaTest.everyMappedTableAndColumnValidatesAgainstLocalDatabase chạy riêng | 1 đạt | Hibernate validate và SELECT tối đa một hàng cho từng entity trên PostgreSQL local, bao gồm tên cột và kiểu tùy biến. Không ghi dữ liệu |
+| SpecificationAuditTest | 11 test: 2 đạt, 9 failure, 0 error | Các probe đặt kỳ vọng theo PDF để phát hiện khoảng thiếu, giữ ngoài source set mặc định |
 
-Các probe đặt kỳ vọng theo đặc tả; failure là thiếu sót của hành vi hiện tại được tái hiện,
-không phải lỗi biên dịch. Không suy rộng các test mock thành bằng chứng đã chạy E2E với PostgreSQL/MinIO thật.
+Lượt mặc định kết thúc lúc **20:05:45, 16/10/2026, Asia/Bangkok**: Maven BUILD SUCCESS, tổng 22 test khai báo, 19 chạy đạt và 3 bỏ qua. XML probe ghi 11 testcase hoàn tất lúc khoảng 20:08:16; suite mapping DB hoàn tất khoảng 20:08:37. Kết quả probe/mapping được đối chiếu trực tiếp từ XML Surefire, không diễn giải failure nghiệp vụ thành lỗi biên dịch hoặc test error.
 
-Tổng bằng chứng: **14 test trạng thái tài khoản đạt; 6 probe đối chiếu gồm 1 đạt và 5 failure,
-0 error**. Lần chạy probe cuối kết thúc 02:07:43 ngày 16/10/2026 (Asia/Bangkok).
-Maven trả BUILD FAILURE ở lệnh probe do 5 assertion chưa đạt; biên dịch main/test thành công.
+## 2. Chi tiết 11 probe theo PDF
 
-## 2. Nguồn bằng chứng
+| Test | Kỳ vọng theo đặc tả | Quan sát | Kết quả |
+|---|---|---|---|
+| uc01UserCreationHashesPasswordBeforeSave | Password được hash trước save | Giá trị đưa vào repository vẫn bằng password đầu vào | Không đạt — F01 |
+| uc05CustomerCannotCreateRooms | CUSTOMER bị từ chối 403 | HTTP 201 với service persistence giả | Không đạt — F02 |
+| uc05RoomUpdateChangesTheStoredEntity | Entity và response có tên mới | Tên vẫn là Original name | Không đạt — F04 |
+| uc05CreatedRoomHasRequiredPropertyAndRoomTypeRelations | Room có quan hệ property và room type hợp lệ | Cả hai quan hệ đều null khi đưa vào repository, dù request có ID | Không đạt — UC-05 |
+| uc06UploadPersistsMediaMetadata | Upload nối với metadata/liên kết ảnh | Không gọi RoomImageRepository.save | Không đạt — F05 |
+| uc06UploadEndpointAcceptsMultipartFile | Servlet Part được bind đúng | HTTP 201, Part không null, filename đúng | Đạt ở boundary binding |
+| uc07AnonymousGuestCanSearchRooms | GUEST tìm công khai nhận 200 | HTTP 401 | Không đạt — F06 |
+| uc08DraftPropertyCannotBeShownAsPublicRoomDetail | Không trả chi tiết công khai của property DRAFT | Service trả response thay vì từ chối | Không đạt — F08 |
+| uc08QuoteRejectsZeroGuests | Số khách phải dương | Service chấp nhận 0 khách và tạo quote | Không đạt — F08 |
+| uc08QuoteRejectsAnIncompleteDatePair | Một đầu ngày thiếu phải được báo input không hợp lệ | Service trả response dạng giá tham khảo | Không đạt — F08 |
+| uc08QuoteSumsEachNightAndUsesRoomTypeWithHalfOpenDateRange | Ba đêm giá khác nhau cộng đúng và query theo roomTypeId với khoảng nửa mở | 100000 + 150000 + 200000 = subtotal 450000, 3 đêm; đúng roomTypeId và checkOut truyền vào repository | Đạt ở boundary tính subtotal/query parameters |
 
-- Mã test trạng thái hiện có: [UserAccountStatusTest](../../src/test/java/com/vn/datphong/security/UserAccountStatusTest.java).
-- Mã probe đối chiếu: [SpecificationAuditTest.java](SpecificationAuditTest.java).
-- Kết quả máy chạy audit: log trong thư mục TEMP và XML của Maven Surefire tại `target/surefire-reports`.
-  Thư mục `target` là output build, có thể mất khi chạy clean; bảng kết quả ở trên là bản ghi bền vững trong repo.
-- Đã đọc metadata PostgreSQL local: có index unique `uq_users_email_normalized` trên `lower(btrim(email))`;
-  chưa có migration versioned tương ứng trong repo, nên không coi đó là khả năng bootstrap DB sạch đã đạt.
+Các probe HTTP dùng SecurityFilterChain thật và RoomService giả. Các probe service dùng repository/MinIO giả. Vì vậy:
+- HTTP 201 của probe quyền không chứng minh insert Room trên PostgreSQL thật thành công.
+- Quan hệ null là quan sát trên entity đưa vào repository, chưa thực hiện một insert lỗi lên DB.
+- Tổng giá đúng không chứng minh thuế 10%, chính sách hủy viết cứng, TTL quote hoặc tồn kho đã đúng.
+- Upload nhận Part đúng không chứng minh MIME/checksum/lifecycle, object thật hay metadata đã lưu.
+- Probe không hash password gọi phương thức create trực tiếp để kiểm tra nội dung ghi, không chứng minh có đăng ký public.
 
-## 3. Chạy lại khi cần tái hiện
+Mã probe: [SpecificationAuditTest.java](SpecificationAuditTest.java). Constructor RoomServiceImp đã được cập nhật theo dependency RoomRateRepository hiện tại, không thay đổi logic sản phẩm.
 
-Mở terminal ở thư mục chứa pom.xml và dùng JDK/JAVA_HOME phù hợp với dự án.
+## 3. Kiểm tra DB và source
 
-Kiểm tra trạng thái tài khoản:
+Đã chạy SchemaTool inspect ở chế độ đọc:
+- localhost:5435/vivu có 74 bảng public, không bảng nào có dòng dữ liệu.
+- Có unique email chuẩn hóa uq_users_email_normalized.
+- Có exclusion ex_catalog_room_allocation cho allocation chưa release.
+- Có CHECK ngày/tiền booking, refund reservation và unique amenity code.
+- Hibernate validate/SELECT 74 entity đạt.
 
-```powershell
-.\mvnw.cmd -B -ntp '-Dtest=UserAccountStatusTest' test
-```
+Log/metadata/XML của lượt này:
+- target/spec-audit/default-tests.log
+- target/spec-audit/probes.log
+- target/spec-audit/db-inspection.txt
+- target/spec-audit/results.json — tổng hợp từ XML
+- target/surefire-reports/*spec-audit*.xml
 
-Probe audit được giữ ngoài source set mặc định. Muốn chạy lại, sao chép nó vào source test tạm:
+Thư mục target là output build, không phải nguồn yêu cầu hoặc dữ liệu nghiệp vụ; có thể bị mất khi clean. Bảng kết quả trong tài liệu là bản ghi bền vững.
 
-```powershell
-$probePath = 'src/test/java/com/vn/datphong/audit/SpecificationAuditTest.java'
-if (Test-Path -LiteralPath $probePath) { throw 'File đã tồn tại; hãy kiểm tra trước khi ghi đè.' }
+## 4. Chạy lại
+
+Tại thư mục có pom.xml, dùng JDK 17 trở lên tương thích cấu hình dự án. PostgreSQL local phải đang chạy nếu chạy contextLoads hoặc mapping DB.
+
+Bộ mặc định, không chạy các test ghi DB mở rộng:
+
+~~~powershell
+$env:SPRING_JPA_HIBERNATE_DDL_AUTO = 'validate'
+$env:DATPHONG_SCHEMA_VALIDATE = 'false'
+.\mvnw.cmd -B -ntp test
+~~~
+
+Chỉ bật test mapping/SELECT DB, không bật các test tạo schema hoặc persistence roundtrip:
+
+~~~powershell
+$env:DATPHONG_SCHEMA_VALIDATE = 'true'
+.\mvnw.cmd -B -ntp '-Dtest=EntitySchemaTest#everyMappedTableAndColumnValidatesAgainstLocalDatabase' test
+~~~
+
+Probe audit giữ ngoài src/test. Bản sao tạm chỉ được tạo khi chưa có file đích:
+
+~~~powershell
+$probePath = Join-Path (Get-Location) 'src/test/java/com/vn/datphong/audit/SpecificationAuditTest.java'
+if (Test-Path -LiteralPath $probePath) { throw 'File đã tồn tại, không ghi đè.' }
 New-Item -ItemType Directory -Path (Split-Path $probePath) -Force | Out-Null
 Copy-Item -LiteralPath docs/audit/SpecificationAuditTest.java -Destination $probePath
-.\mvnw.cmd -B -ntp '-Dtest=SpecificationAuditTest' test
-```
+try {
+    .\mvnw.cmd -B -ntp '-Dtest=SpecificationAuditTest' test
+} finally {
+    Remove-Item -LiteralPath $probePath
+    $classDirectory = Join-Path (Get-Location) 'target/test-classes/com/vn/datphong/audit'
+    if (Test-Path -LiteralPath $classDirectory) {
+        Get-ChildItem -LiteralPath $classDirectory -Filter 'SpecificationAuditTest*.class' -File |
+            ForEach-Object { Remove-Item -LiteralPath $_.FullName }
+    }
+}
+~~~
 
-Lệnh probe dự kiến thất bại ở các yêu cầu chưa sửa. Sau khi kiểm tra, gỡ bản sao tạm trong `src/test`
-và chạy Maven clean ở lần build tiếp theo để loại các class probe cũ khỏi `target/test-classes`.
-Mã chuẩn trong `docs/audit` được giữ để đối chiếu sau khi sửa nghiệp vụ.
+Lệnh probe dự kiến không đạt trong trạng thái hiện tại vì 9 assertion phát hiện thiếu sót. Dọn cả bản sao source và class của probe để lần chạy suite mặc định không nhặt lại các test tạm. Không cần xóa các class/test khác.
 
-## 4. Cách hiểu kiểm tra multipart
+## 5. Giới hạn và những gì không chạy
 
-Controller hiện nhận `jakarta.servlet.http.Part`. Vì vậy probe phải dùng `MockPart` để mô phỏng
-`request.getPart()` như Servlet container. Chỉ dùng `MockMultipartFile` có thể làm Part bị null
-trong MockMvc dù file nằm trong collection MultipartFile của request giả.
-Không dùng khác biệt của mô hình mock đó để kết luận endpoint production không nhận được multipart.
-Việc nhận Part cũng không chứng minh nội dung file đã được kiểm tra MIME/checksum hay lưu metadata đúng.
+- Không chạy normalize-user-status.sql, V000/V001/V002 hoặc lệnh khởi tạo lại DB trong lượt này.
+- Không chạy hai test tạo schema tạm/persistence roundtrip; không seed user/role/phòng/booking hay gửi email.
+- Không thử storage MinIO, Fake Bank hoặc frontend thật.
+- Không chạy concurrency inventory/payment/refund, callback/expiry nhiều instance hay fault injection: workflow tương ứng chưa tồn tại.
+- Không có số đo EXPLAIN, load test, p95/p99, cache isolation/stampede hoặc bằng chứng triển khai production.
+- SQL normalize-user-status.sql xung đột với bốn trạng thái hiện tại là phát hiện từ source, chưa áp dụng để thử trên dữ liệu.
 
-## 5. Chưa kiểm chứng
-
-- Chưa chạy toàn bộ contextLoads trên DB local có ddl-auto:update.
-- Chưa dựng database mới hoàn toàn hoặc chạy Testcontainers/PostgreSQL thật.
-- Chưa thử ghi media thật, lỗi MinIO sau upload, rollback hoặc dọn object mồ côi.
-- Chưa có test concurrency/hold/payment/refund/expiry vì các luồng đó chưa được triển khai.
-- Chưa có load test, EXPLAIN ANALYZE, kiểm thử FE, callback/scheduler nhiều instance hoặc monitoring.
-
-Lượt audit không sửa code nghiệp vụ và không sửa dữ liệu/schema của database.
+Kết quả build/mapping đạt chỉ chứng minh phần được kiểm tra. Không dùng chúng để kết luận 36 use case đã hoàn tất.

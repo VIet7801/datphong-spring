@@ -1,5 +1,7 @@
 # Đối chiếu dự án với đặc tả hệ thống đặt phòng v3.0
 
+> **Bản lưu của lượt kiểm tra trước khi đồng bộ entity/schema và bổ sung detail-quote.** Không dùng các số lượng class, trạng thái enum hay kết luận bootstrap bên dưới làm trạng thái hiện tại. Báo cáo rà soát toàn dự án mới nhất: [PROJECT_SPEC_AUDIT.md](PROJECT_SPEC_AUDIT.md). Kết quả kiểm thử hiện tại: [audit/VERIFICATION.md](audit/VERIFICATION.md).
+
 Ngày kiểm tra: 16/10/2026. Nguồn: [Dac_ta_he_thong_dat_phong_spring.pdf](Dac_ta_he_thong_dat_phong_spring.pdf), 51 trang, 36 use case.
 Các số trang dưới đây là số trang ghi trong PDF. Đánh giá áp dụng cho working tree tại lúc kiểm tra, không chỉ commit HEAD.
 
