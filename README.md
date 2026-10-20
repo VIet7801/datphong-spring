@@ -82,6 +82,31 @@ thì cần thêm quyền `CREATEDB`. Cấu hình Docker mặc định đã đáp
 
 Chi tiết và cách chỉ định JDK/JDBC: [hướng dẫn khởi tạo schema](docs/ENTITY_SCHEMA_INITIALIZATION.md).
 
+## Tạo dữ liệu test theo đặc tả
+
+Khi PostgreSQL đã có schema và MinIO đang chạy, tạo bộ dữ liệu UC bằng:
+
+```powershell
+.\tao-du-lieu-test.cmd
+```
+
+Script tạo 100 booking và dữ liệu liên quan; 3 CUSTOMER, 3 HOST, 3 SUPPORT,
+1 ADMIN. Admin bootstrap hiện có được tái dùng và đổi sang mật khẩu test đúng
+một lần. Mật khẩu dùng BCrypt cost 12; tài khoản và mật khẩu trước mã hóa ở
+[docs/TAI_KHOAN_TEST.md](docs/TAI_KHOAN_TEST.md). Các ca test, ngày dữ liệu và số
+lượng bản ghi ở [docs/DU_LIEU_TEST.md](docs/DU_LIEU_TEST.md).
+
+Chạy lại không tạo trùng, không đổi lại mật khẩu hay dịch ngày. Kiểm chứng dữ liệu:
+
+```powershell
+.\tao-du-lieu-test.cmd -VerifyOnly
+```
+
+Thông tin kết nối dùng biến môi trường hoặc giá trị mặc định trong
+`application.yaml`, giống backend. Script không tự nạp `.env` của Docker Compose.
+Nếu đã đổi cấu hình Compose, đặt các biến `SPRING_DATASOURCE_*` và `MINIO_*`
+tương ứng trước khi chạy.
+
 ## Run from an IDE
 
 Start only the dependencies:
