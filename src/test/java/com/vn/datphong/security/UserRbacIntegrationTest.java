@@ -5,8 +5,13 @@ import com.vn.datphong.controller.*;
 import com.vn.datphong.dto.request.UserStatusUpdateRequest;
 import com.vn.datphong.dto.request.AuditLogSearchRequest;
 import com.vn.datphong.entity.User;
+import com.vn.datphong.enums.UserStatus;
 import com.vn.datphong.exception.*;
 import com.vn.datphong.repository.UserRepository;
+import com.vn.datphong.repository.RoleRepository;
+import com.vn.datphong.repository.RolePermissionRepository;
+import com.vn.datphong.repository.PermissionRepository;
+import com.vn.datphong.repository.AuditLogRepository;
 import com.vn.datphong.service.*;
 import com.vn.datphong.service.Impl.*;
 import com.vn.datphong.service.support.RbacPolicy;
@@ -14,6 +19,7 @@ import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -96,7 +102,10 @@ class UserRbacIntegrationTest {
     @EnableWebMvc
     @EnableWebSecurity
     @EnableTransactionManagement
-    @EnableJpaRepositories(basePackageClasses = UserRepository.class)
+    @EnableJpaRepositories(basePackageClasses = UserRepository.class,
+            includeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE,
+                    classes = {UserRepository.class, RoleRepository.class, RolePermissionRepository.class,
+                            PermissionRepository.class, AuditLogRepository.class}))
     @Import({SecurityConfig.class, CustomUserDetailsService.class, AuthenticationService.class,
             AuthenticationController.class, UserProfileController.class, AdminUserController.class,
             AdminRoleController.class, AdminPermissionController.class, AuditLogController.class,
@@ -329,6 +338,19 @@ class UserRbacIntegrationTest {
     }
 
     @Test
+    void adminSearchMatchesFullNameIgnoringCaseAndAppliesStatusFilter() throws Exception {
+        jdbc.update("UPDATE users SET full_name='Distinct Profile', status='LOCKED', active=false WHERE id=35");
+        String adminToken = token("admin");
+        mvc.perform(get("/api/v1/admin/users").param("keyword", "dIsTiNcT").param("status", "LOCKED")
+                .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.items", hasSize(1)))
+                .andExpect(jsonPath("$.data.items[0].id").value(35));
+        mvc.perform(get("/api/v1/admin/users").param("keyword", "dIsTiNcT").param("status", "ACTIVE")
+                .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.items", hasSize(0)));
+    }
+
+    @Test
     void adminCanCreateInactiveCustomerWithHashedPasswordAndSeparateRoleApi() throws Exception {
         jsonRequest(post("/api/v1/admin/users"), "admin", """
                 {"username":"new_customer","fullName":"New Customer","email":"new@example.test",
@@ -376,6 +398,20 @@ class UserRbacIntegrationTest {
     @Test
     void lastActiveAdminIsProtectedUnderDatabaseLock() {
         jdbc.update("UPDATE users SET active=false, status='LOCKED' WHERE id=2");
+        new TransactionTemplate(transactions).executeWithoutResult(tx -> {
+            policy.lockAdministration();
+            User lastAdmin = users.findById(1L).orElseThrow();
+            BusinessException error = assertThrows(BusinessException.class,
+                    () -> policy.preserveLastAdmin(lastAdmin, false));
+            assertEquals(409, error.getStatus());
+        });
+    }
+
+    @ParameterizedTest
+    @CsvSource(value = {"false,ACTIVE", "null,ACTIVE", "true,LOCKED", "true,IN_ACTIVE",
+            "true,PENDING_VERIFICATION"}, nullValues = "null")
+    void unavailableAdminDoesNotAllowDisablingTheLastActiveAdmin(Boolean active, UserStatus status) {
+        jdbc.update("UPDATE users SET active=?, status=? WHERE id=2", active, status.name());
         new TransactionTemplate(transactions).executeWithoutResult(tx -> {
             policy.lockAdministration();
             User lastAdmin = users.findById(1L).orElseThrow();

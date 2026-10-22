@@ -8,15 +8,17 @@ spring:
       maximum-pool-size: 10
       minimum-idle: 2
   jpa:
-    open-in-view: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: validate
+      batchsize: 50
     show-sql: false
     properties:
       hibernate:
         format_sql: true
         jdbc:
           batch_size: 20
+    open-in-view: false
   data:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
@@ -41,7 +43,6 @@ minio:
   secretKey: ${MINIO_SECRET_KEY:hoclaptrinh@2026}
   bucket: ${MINIO_BUCKET:vivu-bucket}
   region: ${MINIO_REGION:us-east-1}
-
 springdoc:
   api-docs:
     enabled: true
@@ -52,13 +53,6 @@ springdoc:
     url: /v3/api-docs
     operations-sorter: method
     tags-sorter: alpha
-
 jwt:
-  secret: ${JWT_SECRET:l75KeZzOvj59cLmq0/toOfAG8IfadlSm6au8JME4Qyw=}
-  expiration-ms: ${JWT_EXPIRATION_MS:900000}
-
-logging:
-  level:
-    org.hibernate.orm.jdbc.warn: ERROR
-    org.hibernate.orm.deprecation: ERROR
-    org.springframework.security.config.annotation.authentication.configuration.InitializeUserDetailsBeanManagerConfigurer: ERROR
+    secret: ${JWT_SECRET:l75KeZzOvj59cLmq0/toOfAG8IfadlSm6au8JME4Qyw=}
+    expiration-ms: ${JWT_EXPIRATION_MS:900000}

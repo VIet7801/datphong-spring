@@ -150,16 +150,16 @@ class EntitySchemaTest {
                 session.persist(rate);
                 Booking booking = Booking.builder().bookingCode(key).user(customer).property(property)
                         .roomType(roomType).room(room).checkinDate(LocalDate.of(2027, 1, 1))
-                        .checkoutDate(LocalDate.of(2027, 1, 2)).expiresAt(Instant.now().plusSeconds(600))
+                        .checkoutDate(LocalDate.of(2027, 1, 2)).expiresAt(LocalDateTime.now(ZoneOffset.UTC).plusSeconds(600))
                         .subtotalAmount(new BigDecimal("100.00")).totalPrice(new BigDecimal("100.00"))
-                        .priceVersion(1L).cancellationPolicySnapshot(Map.of("revision", 1))
-                        .propertyTimezoneSnapshot("Asia/Bangkok").checkinLocalSnapshot(LocalTime.of(14, 0)).build();
+                        .priceVersion(1L).cancellationPolicySnapshot("{\"revision\":1}").build();
                 session.persist(booking);
                 session.persist(BookingNight.builder().booking(booking).stayDate(booking.getCheckinDate())
                         .nightlyRate(new BigDecimal("100.00")).taxAmount(BigDecimal.ZERO).feeAmount(BigDecimal.ZERO)
                         .priceVersion(1L).build());
                 StayRange stay = new StayRange(booking.getCheckinDate(), booking.getCheckoutDate());
-                RoomAllocation allocation = RoomAllocation.builder().booking(booking).room(room).stay(stay).build();
+                RoomAllocation allocation = RoomAllocation.builder().booking(booking).room(room)
+                        .checkinDate(stay.from()).checkoutDate(stay.to()).build();
                 session.persist(allocation);
                 Payment payment = Payment.builder().booking(booking).merchantId("schema-test").amount(new BigDecimal("100.00"))
                         .idempotencyKey(key).requestHash(key).intentExpiresAt(Instant.now().plusSeconds(600))
@@ -172,7 +172,9 @@ class EntitySchemaTest {
                 session.flush();
                 Long allocationId = allocation.getId();
                 session.clear();
-                assertEquals(stay, session.find(RoomAllocation.class, allocationId).getStay());
+                RoomAllocation storedAllocation = session.find(RoomAllocation.class, allocationId);
+                assertEquals(stay.from(), storedAllocation.getCheckinDate());
+                assertEquals(stay.to(), storedAllocation.getCheckoutDate());
                 assertNotNull(session.find(UserRole.class, new UserRoleId(customer.getId(), role.getId())).getAssignedAt());
             } finally {
                 transaction.rollback();
