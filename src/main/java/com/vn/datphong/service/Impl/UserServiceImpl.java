@@ -13,6 +13,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import com.vn.datphong.service.AuditLogWriter;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.function.Consumer;
 
 import java.util.List;
 
@@ -23,7 +29,8 @@ public class UserServiceImpl implements UserService {
     @Lazy
     @Autowired
     private UserRepository userRepository;
-
+    @Autowired
+    private AuditLogWriter auditLogWriter;
     @Override
     public List<UsersResponse> findAll() {
         // Chỉ đến được thân hàm sau khi proxy kiểm tra @PreAuthorize ở cấp class thành công.
@@ -55,20 +62,80 @@ public class UserServiceImpl implements UserService {
         return UserMapper.toResponse(u);
     }
 
+    // Replace in: src/main/java/com/vn/datphong/service/Impl/UserServiceImpl.java
     @Override
-    // Kiểm tra quyền trước khi đọc hoặc cập nhật dữ liệu của user theo ID.
+    //kiểm tra ADMIN hoặc chủ hồ sơ.
     @PreAuthorize("hasAuthority('ROLE_ADMIN') or @userAuthorization.isOwner(#id, authentication)")
     @Transactional(propagation = Propagation.REQUIRED)
-    public UsersResponse update(Long id,UsersResquest req) {
-        // Quyền đã được kiểm tra trước khi vào hàm. Hibernate theo dõi entity trong transaction;
-        // các field thay đổi được ghi xuống DB khi transaction commit, không phải ngay lúc set(...).
-        User updated = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundExcept("Id: "+id+" khong ton tai"));
-        if(req.getFullName()!=null) updated.setFullName(req.getFullName());
-        if(req.getEmail()!=null) updated.setEmail(req.getEmail());
-        if(req.getPhone()!=null) updated.setPhone(req.getPhone());
-        if(req.getGender()!=null) updated.setGender(req.getGender());
-        if(req.getAvatar()!=null) updated.setAvatar(req.getAvatar());
+    public UsersResponse update(Long id, UsersResquest req) {
+        //findById tải User cần sửa vào transaction
+        User updated = userRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundExcept("Id: " + id + " không tồn tại")
+                );
+        //be4 + after state khởi tạo đang rỗng
+        Map<String, Object> beforeState = new LinkedHashMap<>();
+        Map<String, Object> afterState = new LinkedHashMap<>();
+        //Nếu khác nhau, ghi giá trị trước/sau rồi gọi setter cập nhật Entity.
+        //Nếu có thay đổi, sinh operationId và gọi Writer
+        setAndTrack(
+                "fullName", updated.getFullName(), req.getFullName(),
+                updated::setFullName, beforeState, afterState
+        );
+        setAndTrack(
+                "email", updated.getEmail(), req.getEmail(),
+                updated::setEmail, beforeState, afterState
+        );
+        setAndTrack(
+                "phone", updated.getPhone(), req.getPhone(),
+                updated::setPhone, beforeState, afterState
+        );
+        setAndTrack(
+                "gender", updated.getGender(), req.getGender(),
+                updated::setGender, beforeState, afterState
+        );
+        setAndTrack(
+                "avatar", updated.getAvatar(), req.getAvatar(),
+                updated::setAvatar, beforeState, afterState
+        );
+
+        if (!beforeState.isEmpty()) {
+            String operationId = UUID.randomUUID().toString();
+            auditLogWriter.userUpdated(
+                    updated.getId(), beforeState, afterState, operationId
+            );
+        }
+
         return UserMapper.toResponse(updated);
+    }
+    //so sánh giá trị cũ với dữ liệu mới.
+    private <T> void setAndTrack(
+            String field,
+            T oldValue,
+            T newValue,
+            Consumer<T> setter,
+            Map<String, Object> beforeState,
+            Map<String, Object> afterState
+    ) {
+        //
+        if (newValue == null || Objects.equals(oldValue, newValue)) {
+            return;
+        }
+
+        beforeState.put(field, auditValue(field, oldValue));
+        afterState.put(field, auditValue(field, newValue));
+        setter.accept(newValue);
+    }
+
+    private Object auditValue(String field, Object value) {
+        if (value == null) {
+            return null;
+        }
+
+        return switch (field) {
+            case "email", "phone", "avatar" -> "[REDACTED]";
+            default -> value;
+        };
     }
 
     @Override
