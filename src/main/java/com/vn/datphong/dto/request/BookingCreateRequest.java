@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Data
@@ -33,12 +34,15 @@ public class BookingCreateRequest {
     /** Mã voucher áp dụng, có thể để trống nếu không dùng voucher. */
     private String voucherCode;
 
-    @NotBlank(message = "idempotencyKey khong duoc de trong")
+    /** Không bắt buộc ở body: khóa idempotency được gửi qua header Idempotency-Key. */
     private String idempotencyKey;
 
     private String quoteToken;
 
     private Long priceVersion;
+
+    /** Tổng tiền khách đã thấy ở báo giá; lệch giá hiện hành -> PRICE_CHANGED. */
+    private BigDecimal expectedTotal;
 
     @Size(max = 500)
     private String specialRequest;
@@ -49,3 +53,4 @@ public class BookingCreateRequest {
         return checkoutDate.isAfter(checkinDate);
     }
 }
+

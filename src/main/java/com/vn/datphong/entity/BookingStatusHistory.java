@@ -19,10 +19,9 @@ import java.time.Instant;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "booking_status_history", uniqueConstraints = {
-    @UniqueConstraint(name = "uq_bookingstatushistory_0", columnNames = {"event_id"})
-})
+@Table(name = "booking_status_history")
 public class BookingStatusHistory {
+
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -33,38 +32,28 @@ public class BookingStatusHistory {
     private Booking booking;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "from_status", nullable = true)
+    @Column(name = "from_status", length = 30)
     private BookingStatusType fromStatus;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "to_status", nullable = false)
+    @Column(name = "to_status", nullable = false, length = 30)
     private BookingStatusType toStatus;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "source", nullable = false)
+    @Column(nullable = false, length = 30)
     private BookingStatusChangeSource source;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "actor_id", nullable = true)
+    @JoinColumn(name = "actor_id")
     private User actor;
 
-    @Column(name = "reason", nullable = true, columnDefinition = "TEXT")
+    @Column(length = 500)
     private String reason;
+
+    @Column(name = "correlation_id", length = 64)
+    private String correlationId;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
-    private Instant createdAt;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "actor_type", nullable = false)
-    private ActorType actorType;
-
-    @Column(name = "occurred_at", nullable = false)
-    private Instant occurredAt;
-
-    @Column(name = "correlation_id", nullable = false)
-    private String correlationId;
-
-    @Column(name = "event_id", nullable = false)
-    private UUID eventId;
+    private LocalDateTime createdAt;
 }

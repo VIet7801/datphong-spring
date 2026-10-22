@@ -13,6 +13,7 @@ public class CancellationPreviewResponse {
     private Long bookingId;
     private BookingStatusType currentStatus;
     private BigDecimal paidAmount;
+    private BigDecimal refundPercent;
     private BigDecimal cancellationFee;
     private BigDecimal refundableAmount;
     private String currency;

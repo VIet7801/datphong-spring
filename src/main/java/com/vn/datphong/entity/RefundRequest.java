@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 @Table(name = "refund_requests")
 public class RefundRequest {
 
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -42,13 +43,26 @@ public class RefundRequest {
     private String reason;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "refund_destination", nullable = false)
-    private RefundDestinationType refundDestination;
+    @Column(name = "refund_destination", nullable = false, length = 20)
+    @Builder.Default
+    private RefundDestinationType refundDestination = RefundDestinationType.BANK;
+
+    /** CANCELLATION | LATE_PAYMENT | RECONCILIATION: quyết định trạng thái booking sau khi hoàn tiền thành công. */
+    @Column(name = "kind", nullable = false, length = 30)
+    @Builder.Default
+    private String kind = "CANCELLATION";
+
+    @Column(name = "attempts", nullable = false)
+    @Builder.Default
+    private Integer attempts = 0;
+
+    @Column(name = "next_retry_at")
+    private LocalDateTime nextRetryAt;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 30)
     @Builder.Default
-    private RefundStatusType status = RefundStatusType.PENDING;
+    private RefundStatusType status = RefundStatusType.REQUESTED;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "approved_by")
@@ -64,13 +78,13 @@ public class RefundRequest {
     @Column(name = "provider_reference", unique = true, length = 120)
     private String providerReference;
 
-    @Column(name = "idempotency_key", length = 120)
+    @Column(name = "idempotency_key", length = 120, unique = true)
     private String idempotencyKey;
 
     @Column(name = "failure_code", length = 80)
     private String failureCode;
 
-    @Column(name = "failure_message", length = 500, columnDefinition = "TEXT")
+    @Column(name = "failure_message", length = 500)
     private String failureMessage;
 
     @Version

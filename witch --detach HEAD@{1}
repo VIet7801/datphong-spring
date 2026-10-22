@@ -1,0 +1,21 @@
+[33m5c9131e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{0}: checkout: moving from main to main
+[33m5c9131e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{1}: checkout: moving from main to main
+[33m5c9131e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{2}: checkout: moving from main to main
+[33m5c9131e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{3}: branch: Reset to origin/main
+[33m5c9131e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{4}: pull origin main: Fast-forward
+[33mb6bd31f[m HEAD@{5}: reset: moving to HEAD
+[33mb6bd31f[m HEAD@{6}: pull origin main: Fast-forward
+[33mecb8aa6[m HEAD@{7}: reset: moving to HEAD
+[33mecb8aa6[m HEAD@{8}: commit: ...
+[33ma2d6662[m HEAD@{9}: pull origin main: Fast-forward
+[33m6780cba[m HEAD@{10}: commit: ...
+[33m26c9dd5[m HEAD@{11}: commit (merge): Merge origin/main and resolve conflicts
+[33mdb5e000[m HEAD@{12}: rebase (abort): returning to refs/heads/main
+[33mc6cf529[m HEAD@{13}: pull --rebase origin main (start): checkout c6cf529492187948577f3f0b5dd5299a95e510d7
+[33mdb5e000[m HEAD@{14}: rebase (abort): returning to refs/heads/main
+[33mc6cf529[m HEAD@{15}: pull --rebase origin main (start): checkout c6cf529492187948577f3f0b5dd5299a95e510d7
+[33mdb5e000[m HEAD@{16}: commit: Room
+[33mb4d71dc[m HEAD@{17}: pull origin main: Fast-forward
+[33m9143788[m HEAD@{18}: pull origin main: Fast-forward
+[33m99a6616[m HEAD@{19}: pull origin main: Fast-forward
+[33mdb91d1d[m HEAD@{20}: clone: from https://github.com/VIet7801/datphong-spring.git

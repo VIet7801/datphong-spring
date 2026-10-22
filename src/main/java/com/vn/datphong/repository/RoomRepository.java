@@ -22,6 +22,24 @@ import java.util.function.Function;
 @Repository
 public interface RoomRepository extends JpaRepository<Room,Long> {
     boolean existsByCode(String code);
+
+    /** Chủ sở hữu (owner_id) của property chứa phòng, dùng cho kiểm tra owner scope ở mọi thao tác ghi. */
+    @Query("select r.property.owner.id from Room r where r.id = :roomId")
+    Long findOwnerIdByRoomId(@Param("roomId") Long roomId);
+
+    boolean existsByPropertyIdAndCodeIgnoreCase(Long propertyId, String code);
+
+    java.util.List<Room> findByPropertyIdOrderByIdAsc(Long propertyId);
+
+    /**
+     * Khóa hàng phòng (PESSIMISTIC_WRITE) để tuần tự hóa mọi booking cùng một phòng vật lý. Timeout ngắn để
+     * không treo request; hết thời gian chờ ném PessimisticLockingFailureException -> 409 RESOURCE_BUSY.
+     */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.QueryHints(
+            @jakarta.persistence.QueryHint(name = "jakarta.persistence.lock.timeout", value = "5000"))
+    @Query("select r from Room r where r.id = :id")
+    java.util.Optional<Room> findByIdForUpdate(@Param("id") Long id);
     Optional<Room> findByCode(String code);
     List<Room> findAll();
 
@@ -69,5 +87,6 @@ public interface RoomRepository extends JpaRepository<Room,Long> {
             Pageable pageable
     );
 }
+
 
 

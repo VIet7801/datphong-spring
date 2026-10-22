@@ -23,29 +23,26 @@ public class RoomAllocation extends BaseEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "booking_id", nullable = false)
-    private Booking booking;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "room_id", nullable = false)
     private Room room;
 
-    @org.hibernate.annotations.Type(com.vn.datphong.persistence.StayRangeType.class)
-    @Column(name = "stay", nullable = false, columnDefinition = "daterange")
-    private com.vn.datphong.persistence.StayRange stay;
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "booking_id", nullable = false, unique = true)
+    private Booking booking;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    @Builder.Default
-    private AllocationStatus status = AllocationStatus.HELD;
+    @Column(name = "checkin_date", nullable = false)
+    private LocalDate checkinDate;
 
-    @Column(name = "released_at", nullable = true)
-    private Instant releasedAt;
+    @Column(name = "checkout_date", nullable = false)
+    private LocalDate checkoutDate;
 
-    @Column(name = "release_reason", nullable = true)
+    @Column(name = "hold_expires_at")
+    private LocalDateTime holdExpiresAt;
+
+    @Column(name = "released_at")
+    private LocalDateTime releasedAt;
+
+    @Column(name = "release_reason", length = 40)
     private String releaseReason;
-
-    @Version
-    private Long version;
-
 }
+

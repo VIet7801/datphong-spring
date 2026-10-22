@@ -28,21 +28,20 @@ public class OutboxEvent {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "event_type", nullable = false)
+    @Column(name = "event_type", nullable = false, length = 100)
     private String eventType;
 
-    @Column(name = "aggregate_type", nullable = false)
+    @Column(name = "aggregate_type", nullable = false, length = 80)
     private String aggregateType;
 
     @Column(name = "aggregate_id", nullable = false)
     private Long aggregateId;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "payload", nullable = false, columnDefinition = "jsonb")
-    private Map<String, Object> payload;
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String payload;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(nullable = false, length = 30)
     @Builder.Default
     private OutboxStatus status = OutboxStatus.PENDING;
 
@@ -52,27 +51,15 @@ public class OutboxEvent {
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
-    private Instant createdAt;
+    private LocalDateTime createdAt;
 
-    @Column(name = "processed_at", nullable = true)
-    private Instant processedAt;
+    @Column(name = "processed_at")
+    private LocalDateTime processedAt;
 
-    @Column(name = "event_id", nullable = false)
-    private UUID eventId;
+    /** Worker chỉ nhận sự kiện khi available_at <= now; claim đặt lease, lỗi đặt backoff. */
+    @Column(name = "available_at")
+    private LocalDateTime availableAt;
 
-    @Column(name = "payload_version", nullable = false)
-    @Builder.Default
-    private Integer payloadVersion = 1;
-
-    @Column(name = "available_at", nullable = false)
-    private Instant availableAt;
-
-    @Column(name = "lease_owner", nullable = true)
-    private String leaseOwner;
-
-    @Column(name = "lease_until", nullable = true)
-    private Instant leaseUntil;
-
-    @Column(name = "last_error", nullable = true, columnDefinition = "TEXT")
+    @Column(name = "last_error", length = 500)
     private String lastError;
 }

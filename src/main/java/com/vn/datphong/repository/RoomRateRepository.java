@@ -23,4 +23,19 @@ public interface RoomRateRepository extends JpaRepository<RoomRate, Long> {
             @Param("checkIn") LocalDate checkIn,
             @Param("checkOut") LocalDate checkOut
     );
+
+    // Gồm cả đêm đóng bán: dùng để phân biệt "chưa cấu hình giá" với "đóng bán".
+    @Query("""
+            SELECT r FROM RoomRate r
+            WHERE r.roomType.id = :roomTypeId AND r.stayDate >= :from AND r.stayDate < :to
+            ORDER BY r.stayDate
+            """)
+    List<RoomRate> findAllInRange(@Param("roomTypeId") Long roomTypeId, @Param("from") LocalDate from,
+                                  @Param("to") LocalDate to);
+
+    @Query("""
+            SELECT COUNT(r) FROM RoomRate r
+            WHERE r.roomType.id = :roomTypeId AND r.stayDate >= :from AND r.closedToSale = false
+            """)
+    long countOpenFrom(@Param("roomTypeId") Long roomTypeId, @Param("from") LocalDate from);
 }

@@ -1,5 +1,6 @@
 package com.vn.datphong.dto.response;
 
+
 import com.vn.datphong.enums.BookingStatusType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -8,7 +9,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.Instant;
+import java.time.LocalDateTime;
 
 @Data
 @NoArgsConstructor
@@ -37,7 +38,7 @@ public class BookingResponse {
     private Integer guestsCount;
 
     private BookingStatusType status;
-    private Instant holdExpiresAt;
+    private LocalDateTime holdExpiresAt;
 
     private BigDecimal totalPrice;
     private BigDecimal subtotalAmount;
@@ -51,14 +52,19 @@ public class BookingResponse {
     private String quoteToken;
     private Long priceVersion;
     private String specialRequest;
-    private Instant confirmedAt;
-    private Instant cancelledAt;
+    private LocalDateTime confirmedAt;
+    private LocalDateTime cancelledAt;
     private String cancellationReason;
     private BigDecimal cancellationFee;
     private BigDecimal refundableAmount;
-    private Instant actualCheckIn;
-    private Instant actualCheckOut;
+    private LocalDateTime actualCheckIn;
+    private LocalDateTime actualCheckOut;
 
-    private Instant createdAt;
-    private Instant updatedAt;
+    /** Giá từng đêm đã chốt tại thời điểm đặt. */
+    private java.util.List<NightlyRateLineResponse> nights;
+    /** Tên chính sách hủy đã chụp lại (snapshot) lúc đặt. */
+    private String cancellationPolicyName;
+
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }
