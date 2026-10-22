@@ -6,7 +6,7 @@ import com.vn.datphong.security.JwtTokenProvider;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -105,7 +105,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler)
                 )
 
-                // Mọi API quản trị yêu cầu ADMIN; service kiểm tra thêm permission từng thao tác.
+                // UC-19: mở riêng GET Audit Log cho ADMIN/SUPPORT; service kiểm tra AUDIT_READ.
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/auth/login",
@@ -115,6 +115,11 @@ public class SecurityConfig {
                                 "/v3/api-docs",
                                 "/v3/api-docs/**"
                         ).permitAll()
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/admin/audit-logs",
+                                "/api/admin/audit-logs"
+                        ).hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPPORT")
                         .requestMatchers("/api/v1/admin/**", "/api/admin/**")
                         .hasAuthority("ROLE_ADMIN")
                         .anyRequest().authenticated()

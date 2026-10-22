@@ -3,6 +3,7 @@ package com.vn.datphong.security;
 import com.vn.datphong.config.SecurityConfig;
 import com.vn.datphong.controller.*;
 import com.vn.datphong.dto.request.UserStatusUpdateRequest;
+import com.vn.datphong.dto.request.AuditLogSearchRequest;
 import com.vn.datphong.entity.User;
 import com.vn.datphong.exception.*;
 import com.vn.datphong.repository.UserRepository;
@@ -136,6 +137,7 @@ class UserRbacIntegrationTest {
     @Autowired private org.springframework.security.core.userdetails.UserDetailsService details;
     @Autowired private JwtTokenProvider tokens;
     @Autowired private AdminUserService adminUsers;
+    @Autowired private AuditLogService auditService;
     @Autowired private UserRepository users;
     @Autowired private RbacPolicy policy;
     @Autowired private PlatformTransactionManager transactions;
@@ -147,12 +149,14 @@ class UserRbacIntegrationTest {
     void setup() throws Exception {
         jdbc = new JdbcTemplate(dataSource);
         String catalog = Files.readString(Path.of("scripts/sql/V003__user_rbac_catalog.sql"));
+        String supportAudit = Files.readString(Path.of("scripts/sql/V004__support_audit_read.sql"));
         if (passwordHash == null) passwordHash = encoder.encode(PASSWORD);
         new TransactionTemplate(transactions).executeWithoutResult(tx -> {
             // Các bảng khác trong schema test luôn rỗng; DELETE giữ fixture nhỏ và tránh TRUNCATE CASCADE 74 bảng.
             jdbc.execute("DELETE FROM audit_logs; DELETE FROM user_roles; DELETE FROM role_permissions; "
                     + "DELETE FROM users; DELETE FROM permissions; DELETE FROM roles");
             jdbc.execute(catalog);
+            jdbc.execute(supportAudit);
             addUser(1, "admin", "ROLE_ADMIN");
             addUser(2, "admin2", "ROLE_ADMIN");
             addUser(34, "customer34", "ROLE_CUSTOMER");
@@ -199,6 +203,11 @@ class UserRbacIntegrationTest {
     private ResultActions jsonRequest(MockHttpServletRequestBuilder request, String username, String body) throws Exception {
         return mvc.perform(request.header("Authorization", "Bearer " + token(username))
                 .contentType(MediaType.APPLICATION_JSON).content(body));
+    }
+
+    private MockHttpServletRequestBuilder auditRequest(String path) {
+        return get(path).param("from", OffsetDateTime.now().minusHours(1).toString())
+                .param("to", OffsetDateTime.now().plusHours(1).toString());
     }
 
     @Test
@@ -469,7 +478,7 @@ class UserRbacIntegrationTest {
                 AND permission_id=(SELECT id FROM permissions WHERE code='AUDIT_READ')
                 """);
         jsonRequest(put("/api/v1/admin/roles/" + id("roles", "ROLE_SUPPORT") + "/permissions"), "admin",
-                "{\"version\":0,\"permissionIds\":[" + id("permissions", "AUDIT_READ") + "],\"reason\":\"Vượt quyền\"}")
+                "{\"version\":1,\"permissionIds\":[],\"reason\":\"Thu hồi vượt quyền\"}")
                 .andExpect(status().isForbidden());
     }
 
@@ -493,20 +502,97 @@ class UserRbacIntegrationTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"/api/v1/admin/audit-logs", "/api/admin/audit-logs"})
-    void auditSearchIsAdminOnlyEvenWhenSupportHasAuditRead(String path) throws Exception {
-        jdbc.update("INSERT INTO role_permissions(role_id,permission_id) VALUES (?,?)",
-                id("roles", "ROLE_SUPPORT"), id("permissions", "AUDIT_READ"));
-        MockHttpServletRequestBuilder request = get(path)
-                .param("from", OffsetDateTime.now().minusHours(1).toString())
-                .param("to", OffsetDateTime.now().plusHours(1).toString());
-        mvc.perform(request).andExpect(status().isUnauthorized());
-        mvc.perform(request.header("Authorization", "Bearer " + token("support")))
-                .andExpect(status().isForbidden());
-        mvc.perform(get(path).param("from", OffsetDateTime.now().minusHours(1).toString())
-                .param("to", OffsetDateTime.now().plusHours(1).toString())
-                .header("Authorization", "Bearer " + token("admin")))
+    void adminAndSupportWithAuditReadCanSearchAudit(String path) throws Exception {
+        mvc.perform(auditRequest(path)).andExpect(status().isUnauthorized());
+        mvc.perform(auditRequest(path).header("Authorization", "Bearer " + token("support")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.items").isArray());
+        assertEquals(50L, jdbc.queryForObject(
+                "SELECT actor_id FROM audit_logs WHERE action='AUDIT_LOG_SEARCHED'", Long.class));
+        assertEquals("Tra cứu Audit Log", jdbc.queryForObject(
+                "SELECT reason FROM audit_logs WHERE action='AUDIT_LOG_SEARCHED'", String.class));
+        mvc.perform(auditRequest(path).header("Authorization", "Bearer " + token("admin")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.items").isArray());
+        assertEquals(2, auditCount("AUDIT_LOG_SEARCHED"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/api/v1/admin/audit-logs", "/api/admin/audit-logs"})
+    void supportLosingAuditReadIsDeniedEvenWithPreviouslyIssuedJwt(String path) throws Exception {
+        String previouslyIssuedToken = token("support");
+        jdbc.update("""
+                DELETE FROM role_permissions WHERE role_id=(SELECT id FROM roles WHERE code='ROLE_SUPPORT')
+                AND permission_id=(SELECT id FROM permissions WHERE code='AUDIT_READ')
+                """);
+        mvc.perform(auditRequest(path).header("Authorization", "Bearer " + previouslyIssuedToken))
+                .andExpect(status().isForbidden());
+        assertEquals(0, auditCount("AUDIT_LOG_SEARCHED"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ROLE_CUSTOMER", "ROLE_HOST"})
+    void customerAndHostCannotSearchAuditEvenWithAuditRead(String roleCode) throws Exception {
+        jdbc.update("DELETE FROM user_roles WHERE user_id=35");
+        jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (35,?)", id("roles", roleCode));
+        jdbc.update("INSERT INTO role_permissions(role_id,permission_id) VALUES (?,?)",
+                id("roles", roleCode), id("permissions", "AUDIT_READ"));
+        String token = token("customer35");
+        for (String path : List.of("/api/v1/admin/audit-logs", "/api/admin/audit-logs")) {
+            mvc.perform(auditRequest(path).header("Authorization", "Bearer " + token))
+                    .andExpect(status().isForbidden());
+        }
+        assertEquals(0, auditCount("AUDIT_LOG_SEARCHED"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/api/v1/admin/users", "/api/v1/admin/roles", "/api/v1/admin/permissions"})
+    void supportCannotAccessOtherAdminApisEvenWithTheirPermissions(String path) throws Exception {
+        jdbc.update("""
+                INSERT INTO role_permissions(role_id,permission_id)
+                SELECT ?, p.id FROM permissions p ON CONFLICT DO NOTHING
+                """, id("roles", "ROLE_SUPPORT"));
+        mvc.perform(get(path).header("Authorization", "Bearer " + token("support")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "support", authorities = {"ROLE_SUPPORT", "AUDIT_READ"})
+    void supportCanCallAuditServiceDirectlyWithPermission() {
+        AuditLogSearchRequest request = new AuditLogSearchRequest();
+        request.setFrom(OffsetDateTime.now().minusHours(1));
+        request.setTo(OffsetDateTime.now().plusHours(1));
+        assertNotNull(auditService.search(request));
         assertEquals(1, auditCount("AUDIT_LOG_SEARCHED"));
+    }
+
+    @Test
+    @WithMockUser(username = "support", authorities = "ROLE_SUPPORT")
+    void supportCannotCallAuditServiceDirectlyWithoutPermission() {
+        assertThrows(AccessDeniedException.class, () -> auditService.search(new AuditLogSearchRequest()));
+    }
+
+    @Test
+    @WithMockUser(username = "customer34", authorities = {"ROLE_CUSTOMER", "AUDIT_READ"})
+    void customerCannotBypassRoleCheckByCallingAuditServiceDirectly() {
+        assertThrows(AccessDeniedException.class, () -> auditService.search(new AuditLogSearchRequest()));
+    }
+
+    @Test
+    @WithMockUser(username = "customer35", authorities = {"ROLE_HOST", "AUDIT_READ"})
+    void hostCannotBypassRoleCheckByCallingAuditServiceDirectly() {
+        assertThrows(AccessDeniedException.class, () -> auditService.search(new AuditLogSearchRequest()));
+    }
+
+    @Test
+    void auditAccessFailsWhenItsAccessEventCannotBeSaved() throws Exception {
+        jdbc.execute("ALTER TABLE audit_logs ADD CONSTRAINT reject_audit_search_test CHECK (action <> 'AUDIT_LOG_SEARCHED')");
+        try {
+            mvc.perform(auditRequest("/api/v1/admin/audit-logs")
+                    .header("Authorization", "Bearer " + token("support")))
+                    .andExpect(status().isConflict());
+            assertEquals(0, auditCount("AUDIT_LOG_SEARCHED"));
+        } finally {
+            jdbc.execute("ALTER TABLE audit_logs DROP CONSTRAINT reject_audit_search_test");
+        }
     }
 
     @Test
@@ -526,8 +612,32 @@ class UserRbacIntegrationTest {
     void catalogSeedIsIdempotent() throws Exception {
         long before = jdbc.queryForObject("SELECT count(*) FROM audit_logs", Long.class);
         jdbc.execute(Files.readString(Path.of("scripts/sql/V003__user_rbac_catalog.sql")));
+        jdbc.execute(Files.readString(Path.of("scripts/sql/V004__support_audit_read.sql")));
         assertEquals(before, jdbc.queryForObject("SELECT count(*) FROM audit_logs", Long.class));
-        assertEquals(8L, jdbc.queryForObject("SELECT count(*) FROM role_permissions", Long.class));
+        assertEquals(9L, jdbc.queryForObject("SELECT count(*) FROM role_permissions", Long.class));
+        assertEquals(5L, jdbc.queryForObject("SELECT count(*) FROM users", Long.class));
+    }
+
+    @Test
+    void supportMigrationAddsMissingGrantAndPreservesExistingGrants() throws Exception {
+        jdbc.update("""
+                DELETE FROM role_permissions WHERE role_id=(SELECT id FROM roles WHERE code='ROLE_SUPPORT')
+                AND permission_id=(SELECT id FROM permissions WHERE code='AUDIT_READ')
+                """);
+        long supportVersion = jdbc.queryForObject(
+                "SELECT version FROM roles WHERE code='ROLE_SUPPORT'", Long.class);
+        long beforeEvents = auditCount("AUDIT_ACCESS_POLICY_UPDATED");
+        new TransactionTemplate(transactions).executeWithoutResult(tx -> {
+            try {
+                jdbc.execute(Files.readString(Path.of("scripts/sql/V004__support_audit_read.sql")));
+            } catch (java.io.IOException ex) {
+                throw new java.io.UncheckedIOException(ex);
+            }
+        });
+        assertEquals(9L, jdbc.queryForObject("SELECT count(*) FROM role_permissions", Long.class));
+        assertEquals(supportVersion + 1, jdbc.queryForObject(
+                "SELECT version FROM roles WHERE code='ROLE_SUPPORT'", Long.class));
+        assertEquals(beforeEvents + 1, auditCount("AUDIT_ACCESS_POLICY_UPDATED"));
         assertEquals(5L, jdbc.queryForObject("SELECT count(*) FROM users", Long.class));
     }
 }

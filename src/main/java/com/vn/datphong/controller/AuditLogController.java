@@ -14,7 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RestController
 @RequestMapping({"/api/v1/admin/audit-logs", "/api/admin/audit-logs"})
 @RequiredArgsConstructor
-@Tag(name = "Admin - Audit Log")
+@Tag(name = "Audit Log", description = "ADMIN/SUPPORT có AUDIT_READ theo UC-19")
 public class AuditLogController {
     private final AuditLogService auditLogService;
 

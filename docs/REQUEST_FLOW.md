@@ -149,16 +149,16 @@ Nếu dùng Axios, danh sách nằm tại response.data.data.items.
 
 Đổi permission của role có API PUT /api/v1/admin/roles/{id}/permissions. Quyền mới được nạp ở request kế tiếp. Chặn sửa permission của role đang gắn với chính người thao tác.
 
-## 7. Chỉ ADMIN tra Audit Log
+## 7. ADMIN/SUPPORT có quyền tra Audit Log
 
 Hai URL cùng chính sách:
 
     GET /api/v1/admin/audit-logs
     GET /api/admin/audit-logs
 
-Filter yêu cầu ROLE_ADMIN; Service yêu cầu thêm AUDIT_READ. SUPPORT có AUDIT_READ vẫn nhận 403 theo yêu cầu hiện tại.
+Matcher GET riêng cho hai URL trên yêu cầu ROLE_ADMIN hoặc ROLE_SUPPORT và nằm trước quy tắc /admin/**. Service yêu cầu role tương ứng và AUDIT_READ theo UC-19. Thiếu permission thì nhận 403. Các API quản trị User/Role/Permission vẫn yêu cầu ADMIN.
 
-Service validate bộ lọc, truy vấn Slice, tạo response và ghi AUDIT_LOG_SEARCHED. Không đếm request HTTP.
+Service validate bộ lọc, truy vấn Slice, tạo response và ghi AUDIT_LOG_SEARCHED với actor thực tế và reason “Tra cứu Audit Log”. Không đếm request HTTP.
 
 ## 8. Nhánh lỗi
 

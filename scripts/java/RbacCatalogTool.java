@@ -28,12 +28,17 @@ public class RbacCatalogTool {
                     try (Statement statement = db.createStatement()) {
                         statement.execute("SET LOCAL lock_timeout = '5s'");
                         statement.execute("SET LOCAL statement_timeout = '30s'");
-                        statement.execute(Files.readString(Path.of("scripts/sql/V003__user_rbac_catalog.sql")));
+                        for (String migration : List.of("V003__user_rbac_catalog.sql", "V004__support_audit_read.sql")) {
+                            statement.execute(Files.readString(Path.of("scripts/sql", migration)));
+                        }
                     }
                 }
-                Set<String> adminPermissions = adminPermissions(db);
+                Set<String> adminPermissions = rolePermissions(db, "ROLE_ADMIN");
+                Set<String> supportPermissions = rolePermissions(db, "ROLE_SUPPORT");
                 Set<String> missing = new TreeSet<>(REQUIRED);
                 missing.removeAll(adminPermissions);
+                Set<String> supportMissing = new TreeSet<>(Set.of("AUDIT_READ"));
+                supportMissing.removeAll(supportPermissions);
                 Map<String, Long> after = counts(db);
                 if (!Objects.equals(before.get("users"), after.get("users"))) {
                     throw new IllegalStateException("Migration không được thay đổi số tài khoản");
@@ -42,8 +47,10 @@ public class RbacCatalogTool {
                 System.out.println("AFTER " + after);
                 System.out.println("ADMIN_PERMISSIONS " + adminPermissions);
                 System.out.println("MISSING_REQUIRED " + missing);
-                if (!command.equals("inspect") && !missing.isEmpty()) {
-                    throw new IllegalStateException("ROLE_ADMIN còn thiếu permission bắt buộc");
+                System.out.println("SUPPORT_PERMISSIONS " + supportPermissions);
+                System.out.println("SUPPORT_MISSING_REQUIRED " + supportMissing);
+                if (!command.equals("inspect") && (!missing.isEmpty() || !supportMissing.isEmpty())) {
+                    throw new IllegalStateException("ROLE_ADMIN/ROLE_SUPPORT còn thiếu permission bắt buộc");
                 }
                 if (command.equals("apply")) {
                     db.commit();
@@ -59,15 +66,17 @@ public class RbacCatalogTool {
         }
     }
 
-    private static Set<String> adminPermissions(Connection db) throws SQLException {
+    private static Set<String> rolePermissions(Connection db, String roleCode) throws SQLException {
         Set<String> codes = new TreeSet<>();
-        try (Statement statement = db.createStatement();
-             ResultSet result = statement.executeQuery("""
+        try (PreparedStatement statement = db.prepareStatement("""
                      SELECT p.code FROM permissions p
                      JOIN role_permissions rp ON rp.permission_id=p.id
-                     JOIN roles r ON r.id=rp.role_id WHERE r.code='ROLE_ADMIN'
+                     JOIN roles r ON r.id=rp.role_id WHERE r.code=?
                      """)) {
-            while (result.next()) codes.add(result.getString(1));
+            statement.setString(1, roleCode);
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) codes.add(result.getString(1));
+            }
         }
         return codes;
     }

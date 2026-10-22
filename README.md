@@ -3,9 +3,10 @@
 Spring Boot API for room booking.
 
 Đã tách API hồ sơ cá nhân và quản trị User, bổ sung Permission và giới hạn Audit Log
-cho ADMIN có AUDIT_READ. Xem [báo cáo triển khai và hướng dẫn Swagger](docs/BAO_CAO_USER_PERMISSION_AUDIT_LOG.md).
+cho ADMIN/SUPPORT có AUDIT_READ theo UC-19. Xem [báo cáo triển khai và hướng dẫn Swagger](docs/BAO_CAO_USER_PERMISSION_AUDIT_LOG.md).
 Với DB đã có schema, chạy .\cap-nhat-rbac.cmd để bổ sung catalog/grant;
-dùng -VerifyOnly để kiểm chứng. Khởi động lại backend và đăng nhập lấy JWT mới sau cập nhật.
+dùng -VerifyOnly để kiểm chứng cả ADMIN và SUPPORT. Lệnh này áp dụng V003 và V004 trong cùng transaction.
+Khởi động lại backend sau cập nhật; đăng nhập lấy JWT mới nếu token cũ đã bị thu hồi.
 
 Đọc [luồng request từ FE đến response](docs/REQUEST_FLOW.md) để biết thứ tự xử lý,
 vai trò từng lớp và vị trí đặt breakpoint khi debug đăng nhập hoặc API user.

@@ -1,6 +1,6 @@
 **Bài thực hành: ghi và tìm kiếm Audit Log nghiệp vụ**
 
-> Cập nhật 22/10/2026: mã nguồn đã được triển khai và tách User/Permission theo [báo cáo hiện hành](BAO_CAO_USER_PERMISSION_AUDIT_LOG.md). Các đoạn UserServiceImpl dưới đây là phiên bản bài học trước thay đổi; đọc báo cáo để dùng đúng class/API hiện tại. Quyền tra cứu hiện là ROLE_ADMIN và AUDIT_READ.
+> Cập nhật 22/10/2026: mã nguồn đã được triển khai và tách User/Permission theo [báo cáo hiện hành](BAO_CAO_USER_PERMISSION_AUDIT_LOG.md). Các đoạn UserServiceImpl dưới đây là phiên bản bài học trước thay đổi; đọc báo cáo để dùng đúng class/API hiện tại. Quyền tra cứu hiện là ROLE_ADMIN hoặc ROLE_SUPPORT, đồng thời có AUDIT_READ theo UC-19.
 
 Bản hướng dẫn này được chỉnh theo yêu cầu chỉ làm Audit Log nghiệp vụ. Ta dùng Entity AuditLog và bảng audit_logs đã có trong dự án. Bài học tập trung vào việc biết ai đã làm gì, tác động tới đối tượng nào, khi nào và thay đổi dữ liệu ra sao.
 
@@ -423,7 +423,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('ROLE_ADMIN')")
+@PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPPORT') and hasAuthority('AUDIT_READ')")
 public class AuditLogServiceImpl implements AuditLogService {
     private final AuditLogRepository repository;
 
@@ -482,7 +482,7 @@ public class AuditLogServiceImpl implements AuditLogService {
 }
 ~~~
 
-PreAuthorize kiểm tra quyền trước khi chạy thân hàm. Token hợp lệ của người dùng thường vẫn bị từ chối nếu không có ROLE_ADMIN.
+PreAuthorize kiểm tra quyền trước khi chạy thân hàm. Cần ROLE_ADMIN hoặc ROLE_SUPPORT, đồng thời có AUDIT_READ; token hợp lệ mà không đủ điều kiện vẫn bị từ chối.
 
 entityId cần đi kèm entityType vì USER có ID 34 và BOOKING có ID 34 là hai đối tượng khác nhau.
 
@@ -523,7 +523,7 @@ public class AuditLogController {
 
 ModelAttribute đưa query parameters vào Request DTO. Valid kiểm tra các ràng buộc. Theo [tài liệu Spring MVC](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-methods/modelattrib-method-args.html), binding/validation lỗi trong trường hợp này được báo bằng MethodArgumentNotValidException khi không có BindingResult đứng sau. GlobalExceptionHandler hiện có của dự án đã trả HTTP 400 cho loại lỗi đó.
 
-Giữ EnableMethodSecurity đang có trong SecurityConfig. Với anyRequest().authenticated() và PreAuthorize ở Service như trên, API đọc audit đã yêu cầu đăng nhập và quyền ADMIN. Bài học không cần thêm Filter hoặc dependency vào SecurityFilterChain.
+Giữ EnableMethodSecurity đang có trong SecurityConfig. Đặt matcher GET riêng cho hai URL audit, cho phép ADMIN/SUPPORT, trước quy tắc /admin/** yêu cầu ADMIN; Service kiểm tra thêm AUDIT_READ. Cấu hình hiện hành được trình bày ở mục 11 của báo cáo. Không cần tạo Filter audit HTTP riêng.
 
 Tới đây, bạn đã có API tìm kiếm trên các sự kiện được lưu trong audit_logs. Bước tiếp theo là ghi thêm lịch sử khi nghiệp vụ thực sự thay đổi dữ liệu.
 
@@ -1014,7 +1014,7 @@ Không thêm actorId vào body cập nhật để nhận diện người thực 
 
 | Tình huống | Kết quả cần đạt |
 |---|---|
-| ADMIN, bộ lọc hợp lệ | HTTP 200 và danh sách phù hợp |
+| ADMIN/SUPPORT có AUDIT_READ, bộ lọc hợp lệ | HTTP 200 và danh sách phù hợp |
 | Chỉ actorId | Lịch sử do đúng người đó thực hiện trong khoảng |
 | entityType=USER, entityId=<ID> | Lịch sử tác động tới đúng User |
 | Kết hợp actorId và entityId/entityType | Các điều kiện cùng được áp dụng |
@@ -1061,4 +1061,4 @@ F8 đi qua một dòng; F9 chạy tới breakpoint tiếp theo. Có thể học 
 - actor đang là quan hệ tới User. Không xóa cứng tài khoản đã được tham chiếu nếu chưa có chính sách giữ định danh audit phù hợp.
 - Các yêu cầu bị từ chối trước khi thay đổi nghiệp vụ không tạo sự kiện SUCCESS.
 - requestId/correlationId trong mẫu là operationId nội bộ. Muốn liên kết nhiều bước xử lý thì truyền cùng mã cho các Writer của những bước đó.
-- API đọc không cung cấp thao tác sửa/xóa audit. Phân quyền xem lịch sử dùng ROLE_ADMIN như các chức năng quản trị hiện có.
+- API đọc không cung cấp thao tác sửa/xóa audit. Phân quyền xem lịch sử yêu cầu ROLE_ADMIN hoặc ROLE_SUPPORT, đồng thời có AUDIT_READ theo UC-19.

@@ -2,6 +2,8 @@
 
 Ngày thực hiện: 22/10/2026.
 
+Bản hiện hành đã triển khai quyền tra cứu audit cho ADMIN/SUPPORT có AUDIT_READ theo UC-19. Mục 11 ghi nhận phần code, migration và kiểm thử bổ sung cho SUPPORT; mục 10 giữ kết quả của lần triển khai User/Permission ban đầu.
+
 ## 1. Phạm vi và quyết định áp dụng
 
 Đã sửa trực tiếp mã nguồn trong dự án có file pom.xml, không chỉ cung cấp ví dụ.
@@ -13,7 +15,7 @@ Căn cứ tài liệu Dac_ta_he_thong_dat_phong_spring.pdf:
 - API contract gợi ý, trang 44–45: nhóm /api/v1/users/me và /api/v1/admin/....
 - UC-19, trang 20: tra cứu có phân quyền, phân trang và ghi nhận truy cập audit nhạy cảm.
 
-**Chính sách đã chốt theo yêu cầu lần này: chỉ ADMIN được tra cứu Audit Log, đồng thời ADMIN phải có AUDIT_READ. SUPPORT có AUDIT_READ vẫn bị từ chối.** Đây là điều chỉnh chủ động so với UC-19 vốn cho phép SUPPORT/ADMIN được cấp quyền.
+**Chính sách hiện hành: ADMIN hoặc SUPPORT có AUDIT_READ được tra cứu Audit Log theo UC-19.** ADMIN/SUPPORT thiếu AUDIT_READ và các vai trò khác bị từ chối. Các API quản trị User/Role/Permission vẫn yêu cầu ADMIN cùng permission tương ứng.
 
 Phần Permission được triển khai cho hồ sơ, quản trị User, role, permission và Audit Log trong báo cáo này. Các phân hệ booking, payment, property... cần tiếp tục gắn permission và data scope theo use case riêng; sự tồn tại của một permission trong DB chưa tự bảo vệ các API khác.
 
@@ -114,7 +116,7 @@ Giữ URL cũ làm alias:
 
     GET /api/admin/audit-logs
 
-Hai URL dùng cùng Controller/Service, cùng yêu cầu ROLE_ADMIN + AUDIT_READ. Không có đường vòng dành cho SUPPORT.
+Hai URL dùng cùng Controller/Service, cùng yêu cầu ROLE_ADMIN hoặc ROLE_SUPPORT và đồng thời có AUDIT_READ. Chỉ GET của hai URL audit được mở cho SUPPORT; các URL quản trị khác vẫn yêu cầu ADMIN.
 
 Giữ bộ lọc hiện tại: actorId, entityType, entityId, action, outcome, from, to, page, size.
 
@@ -210,9 +212,9 @@ Nếu body chỉ lặp lại giá trị cũ, không tăng version và không t�
 8. Đổi role của User làm tokenVersion tăng, yêu cầu đăng nhập lại.
 9. Đổi permission của role được áp dụng ở request tiếp theo vì JWT filter nạp quyền hiện tại từ DB.
 
-### 5.5. ADMIN tra cứu Audit Log
+### 5.5. ADMIN/SUPPORT tra cứu Audit Log
 
-1. Filter xác thực JWT và yêu cầu ROLE_ADMIN cho URL /admin.
+1. Filter xác thực JWT; matcher GET riêng cho hai URL audit cho phép ROLE_ADMIN hoặc ROLE_SUPPORT trước quy tắc /admin/**.
 2. Service yêu cầu thêm AUDIT_READ.
 3. Validate bộ lọc và khoảng thời gian.
 4. Repository truy vấn trang log, sắp occurredAt giảm dần rồi id giảm dần.
@@ -239,6 +241,7 @@ Nếu body chỉ lặp lại giá trị cũ, không tăng version và không t�
 Migration bổ sung:
 
     scripts/sql/V003__user_rbac_catalog.sql
+    scripts/sql/V004__support_audit_read.sql
 
 Công cụ chạy:
 
@@ -273,9 +276,11 @@ Migration:
 6. Ghi một audit SYSTEM khi thực sự bổ sung catalog/grant.
 7. Chạy lại không tạo trùng, không thêm audit khi catalog/grant đã đủ.
 
+cap-nhat-rbac.cmd hiện chạy V003 rồi V004 trong cùng transaction. V004 bổ sung AUDIT_READ cho ROLE_SUPPORT nếu thiếu, cập nhật mô tả permission theo UC-19 và ghi AUDIT_ACCESS_POLICY_UPDATED khi có thay đổi thực tế. Nếu thêm liên kết quyền mới, version của role SUPPORT cũng tăng. V003 đã áp dụng được giữ nguyên.
+
 Không xóa User, đổi mật khẩu, đổi User role hoặc xóa permission cũ. Nếu dữ liệu cũ có username trùng, tạo unique index sẽ thất bại và transaction rollback; công cụ không tự chọn xóa tài khoản nào.
 
-Lưu ý: chạy lại migration sẽ bổ sung lại các permission nền tảng còn thiếu của ROLE_ADMIN. Việc này là thao tác bảo trì có chủ đích, không tự chạy mỗi lần backend khởi động.
+Lưu ý: chạy lại migration sẽ bổ sung lại các permission nền tảng còn thiếu của ROLE_ADMIN và AUDIT_READ của ROLE_SUPPORT. Việc này là thao tác bảo trì có chủ đích, không tự chạy mỗi lần backend khởi động. VerifyOnly kiểm tra cả hai role, in MISSING_REQUIRED và SUPPORT_MISSING_REQUIRED.
 
 Kết quả áp dụng và kiểm chứng thực tế được ghi ở mục 10.
 
@@ -314,7 +319,7 @@ Thay 0 bằng version thực tế. Sau thành công dùng version mới cho lầ
 11. Gọi GET /api/v1/admin/roles và /api/v1/admin/permissions để lấy ID, code, version.
 12. Muốn thử gắn permission, tạo role thử chưa gắn với mình; dùng PUT /roles/{id}/permissions. Gửi đầy đủ tập ID mong muốn cùng version và reason.
 13. Tra audit bằng entityType=USER, entityId là User vừa sửa và khoảng from/to bao phủ thời điểm thao tác.
-14. Đổi sang token SUPPORT có AUDIT_READ và gọi lại: phải nhận 403.
+14. Đổi sang token SUPPORT có AUDIT_READ và gọi lại: nhận 200 và AUDIT_LOG_SEARCHED ghi đúng actor SUPPORT. SUPPORT thiếu AUDIT_READ vẫn nhận 403; SUPPORT gọi API quản trị User/Role/Permission cũng nhận 403.
 
 JWT phát hành trước thay đổi này không có tokenVersion sẽ bị từ chối. Hãy đăng nhập lại sau khi khởi động code mới. Khi đổi mật khẩu, trạng thái hoặc role, tài khoản bị tác động cũng cần đăng nhập lại.
 
@@ -340,7 +345,7 @@ JWT phát hành trước thay đổi này không có tokenVersion sẽ bị từ
 | security/JwtAuthenticationFilter.java | Nạp trạng thái/quyền mới và từ chối token đã thu hồi |
 | config/SecurityConfig.java | Bảo vệ nhóm URL quản trị và bật method security |
 | service/AuditLogWriter.java | Lưu audit trong transaction của nghiệp vụ |
-| service/Impl/AuditLogServiceImpl.java | Chỉ ADMIN + AUDIT_READ; audit việc tra cứu |
+| service/Impl/AuditLogServiceImpl.java | ADMIN/SUPPORT có AUDIT_READ; audit việc tra cứu |
 | mapper/UserViewMapper.java | Response riêng cho cá nhân và quản trị |
 | dto/request/StrictRequest.java | Chặn trường ngoài DTO |
 | exception/GlobalExceptionHandler.java | Response lỗi thống nhất |
@@ -352,7 +357,9 @@ DTO cũ UsersResquest/UsersResponse và một số mapper/DTO bài học còn l�
 
 Các URL /users/findAll, /users/detail/{id}, /users/update/{id}, /users/add, /users/delete/{id} không còn hoạt động; FE/Swagger cần chuyển sang URL mới. Riêng URL audit cũ được giữ làm alias có cùng bảo vệ.
 
-## 10. Kết quả kiểm chứng
+## 10. Kết quả lần triển khai User/Permission ban đầu
+
+Mục này là kết quả trước khi mở quyền SUPPORT. Kết quả cập nhật theo UC-19 được ghi tại mục 11.
 
 ### 10.1. Database phát triển đã cập nhật
 
@@ -400,7 +407,7 @@ Những hành vi được kiểm tra:
 - CRUD role/permission, liên kết permission, version, audit và điều kiện xóa.
 - Không nhầm ROLE_MANAGE thành vai trò và chặn mã role trùng permission.
 - Permission sai ROLE_ADMIN trong dữ liệu cũ không nâng quyền SUPPORT.
-- Chỉ ADMIN có AUDIT_READ tra được audit, kiểm tra cả URL mới và alias cũ.
+- Trong bản ban đầu, ca kiểm thử audit kỳ vọng chỉ ADMIN có AUDIT_READ được truy cập; kỳ vọng này đã được đổi trong bản SUPPORT ở mục 11.
 - Migration idempotent và API User cũ không còn được công bố.
 
 Kết quả chạy toàn bộ bộ kiểm thử:
@@ -420,3 +427,128 @@ DatphongApplicationTests đã khởi tạo thành công cấu hình Spring Boot 
 Bằng chứng: target/rbac-audit/final-test.log và các báo cáo XML/TXT trong target/surefire-reports. Lỗi constraint reject_profile_test xuất hiện trong log là tình huống cố ý của ca kiểm tra rollback audit; ca đó đã đạt.
 
 Sau khi lấy code mới, khởi động lại backend và đăng nhập lại trên Swagger. Không cần chạy lại migration trên database cục bộ này; các máy/database khác cần chạy cap-nhat-rbac.cmd một lần.
+
+## 11. Đã triển khai quyền tra cứu Audit Log cho SUPPORT theo UC-19
+
+### 11.1. Đối chiếu yêu cầu và đặc tả
+
+UC-19, trang 20 của đặc tả, cho phép SUPPORT/ADMIN tra cứu audit khi có quyền phù hợp. Yêu cầu trước đây “chỉ dành cho Admin” đã làm phạm vi truy cập hẹp hơn UC-19.
+
+Lần cập nhật này đã sửa trực tiếp mã nguồn và áp dụng migration trên DB để triển khai chính sách UC-19.
+
+Quy tắc làm việc từ lần rà soát này: nếu một yêu cầu khác đặc tả, phải nêu rõ UC/trang, khác ở đâu và ảnh hưởng trước khi triển khai. Quy tắc đã được lưu trong AGENTS.md của dự án.
+
+### 11.2. Kết quả kiểm tra DB hiện tại
+
+Đã kiểm tra và chạy cap-nhat-rbac.cmd áp dụng V003 → V004 trên DB cục bộ:
+
+- Role ROLE_SUPPORT có id=11, version=0.
+- Role này đã được gán AUDIT_READ, id permission=54.
+- Các permission khác của role: SUPPORT_READ, COMPLAINT_MANAGE, REFUND_RECONCILE, MAIL_OPERATE.
+
+Liên kết AUDIT_READ của SUPPORT đã tồn tại từ dữ liệu mẫu, nên V004 giữ nguyên liên kết này và các quyền còn lại, cập nhật mô tả permission theo UC-19, đồng thời ghi AUDIT_ACCESS_POLICY_UPDATED. Hai lớp chặn SUPPORT trong code đã được sửa.
+
+Kết quả thực tế: users=10, roles=4, permissions=25, role_permissions=42 giữ nguyên; audit_logs tăng từ 392 lên 393. Không đổi User, mật khẩu hoặc role của User. V004 chỉ tăng version của role nếu thực sự thêm liên kết quyền mới.
+
+Đã chạy lại migration lần hai trên DB cục bộ: các số lượng giữ nguyên, audit_logs vẫn là 393. Sau đó chạy -VerifyOnly thành công với MISSING_REQUIRED [], SUPPORT_MISSING_REQUIRED [] và RBAC_VERIFIED. Log tương ứng: target/rbac-audit/support-catalog-second-apply.log và target/rbac-audit/support-catalog-verify.log.
+
+ID/version có thể khác giữa các máy hoặc thay đổi sau này; khi thao tác phải lấy lại bằng API danh mục.
+
+### 11.3. Migration cho các máy khác
+
+Công cụ RbacCatalogTool đã được sửa để chạy V003 rồi V004 trong cùng một transaction. DB đã có V003 cũng dùng cùng lệnh; không cần chạy lại khởi tạo schema hoặc dữ liệu mẫu.
+
+~~~powershell
+git pull
+.\cap-nhat-rbac.cmd
+.\cap-nhat-rbac.cmd -VerifyOnly
+~~~
+
+V004 tự bổ sung AUDIT_READ cho ROLE_SUPPORT nếu chưa có và giữ các grant hiện có. Sau kiểm chứng phải thấy:
+
+~~~text
+MISSING_REQUIRED []
+SUPPORT_MISSING_REQUIRED []
+RBAC_VERIFIED
+~~~
+
+Grant áp dụng cho mọi User mang ROLE_SUPPORT. V003 được giữ nguyên để các máy đã áp dụng vẫn có lịch sử nhất quán. Chạy lại không nhân đôi liên kết, không tăng version hoặc thêm audit nếu không có thay đổi thực tế.
+
+### 11.4. Hai URL audit đã được mở trong SecurityConfig
+
+Đã sử dụng import:
+
+~~~java
+import org.springframework.http.HttpMethod;
+~~~
+
+Trong authorizeHttpRequests, quy tắc GET dành cho audit đã được đặt trước quy tắc tổng quát của /admin:
+
+~~~java
+.requestMatchers(
+        HttpMethod.GET,
+        "/api/v1/admin/audit-logs",
+        "/api/admin/audit-logs"
+).hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPPORT")
+.requestMatchers("/api/v1/admin/**", "/api/admin/**")
+.hasAuthority("ROLE_ADMIN")
+.anyRequest().authenticated()
+~~~
+
+Các permitAll dành cho login/Swagger nằm trước đoạn này.
+
+Spring xét thứ tự các matcher; nếu vẫn đặt /admin/** yêu cầu ADMIN ở trước, SUPPORT sẽ bị chặn trước khi vào Controller.
+
+Quy tắc riêng này chỉ mở GET của Audit Log. Các API quản trị User, role, permission tiếp tục yêu cầu ADMIN.
+
+### 11.5. Kiểm tra quyền hiện hành tại AuditLogServiceImpl
+
+Annotation đã được cập nhật:
+
+~~~java
+@PreAuthorize(
+        "hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPPORT') and hasAuthority('AUDIT_READ')"
+)
+~~~
+
+Điều kiện sau thay đổi:
+
+| Danh tính/quyền | Kết quả |
+|---|---|
+| Chưa đăng nhập | 401 |
+| ADMIN có AUDIT_READ | Được tra cứu |
+| ADMIN thiếu AUDIT_READ | 403 |
+| SUPPORT có AUDIT_READ | Được tra cứu |
+| SUPPORT thiếu AUDIT_READ | 403 |
+| CUSTOMER/HOST chỉ có AUDIT_READ | 403 |
+
+Event AUDIT_LOG_SEARCHED mới có reason “Tra cứu Audit Log” để mô tả đúng cả hai vai trò. Actor thực tế lấy từ principal và được lưu trong audit; kiểm thử xác nhận actor SUPPORT được ghi đúng.
+
+AuditLogController dùng chung hai URL hiện tại. Swagger hiển thị nhóm “Audit Log” và mô tả ADMIN/SUPPORT có AUDIT_READ.
+
+### 11.6. Kiểm thử bản SUPPORT
+
+- ADMIN/SUPPORT có AUDIT_READ truy cập thành công cả hai URL; log ghi đúng actor và reason.
+- SUPPORT bị thu hồi AUDIT_READ nhận 403 ngay cả khi dùng JWT phát hành trước đó.
+- ADMIN thiếu AUDIT_READ, CUSTOMER/HOST có AUDIT_READ đều bị từ chối.
+- SUPPORT có các permission quản trị vẫn bị từ chối ở /api/v1/admin/users, /roles và /permissions.
+- Gọi AuditLogService trực tiếp vẫn chịu kiểm tra role và permission.
+- Request không thành công nếu không ghi được nhật ký truy cập AUDIT_LOG_SEARCHED.
+- V004 cấp lại quyền còn thiếu, giữ các quyền khác và tăng version của role khi thêm grant.
+- Chạy lại V003/V004 không tạo trùng, không phát sinh audit thừa.
+
+Kết quả chạy toàn bộ bộ kiểm thử sau cập nhật SUPPORT:
+
+| Lớp kiểm thử | Tổng | Đạt | Bỏ qua | Lỗi/Thất bại |
+|---|---:|---:|---:|---:|
+| DatphongApplicationTests | 1 | 1 | 0 | 0 |
+| EntitySchemaTest | 5 | 2 | 3 | 0 |
+| UserAccountStatusTest | 17 | 17 | 0 | 0 |
+| UserRbacIntegrationTest | 44 | 44 | 0 | 0 |
+| Tổng | 67 | 64 | 3 | 0 |
+
+Maven kết thúc BUILD SUCCESS. Toàn bộ 44 ca RBAC đã chạy trên PostgreSQL với schema test riêng. 3 ca bỏ qua là các kiểm tra schema cũ yêu cầu DATPHONG_SCHEMA_VALIDATE=true, không phải các ca kiểm tra quyền SUPPORT.
+
+Log kiểm thử: target/rbac-audit/support-audit-test.log. Log migration: target/rbac-audit/support-catalog-apply.log. Các lỗi constraint reject_profile_test/reject_audit_search_test trong log là tình huống cố ý để kiểm tra rollback; các ca này đều đạt.
+
+Sau khi triển khai code mới, khởi động lại backend. Permission được nạp từ DB ở từng request; thay đổi permission của role không bắt buộc đăng nhập lại nếu JWT hiện tại còn hợp lệ. Nếu thay đổi role của một User hoặc tokenVersion, User đó phải đăng nhập lại.

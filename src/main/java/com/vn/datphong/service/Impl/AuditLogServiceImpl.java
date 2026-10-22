@@ -23,8 +23,8 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
-// Chính sách được chốt theo yêu cầu: chỉ ADMIN, đồng thời phải có AUDIT_READ.
-@PreAuthorize("hasAuthority('ROLE_ADMIN') and hasAuthority('AUDIT_READ')")
+// UC-19: ADMIN/SUPPORT được tra cứu khi có AUDIT_READ.
+@PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_SUPPORT') and hasAuthority('AUDIT_READ')")
 public class AuditLogServiceImpl implements AuditLogService {
     private final AuditLogRepository repository;
     private final AuditLogWriter audit;
@@ -91,7 +91,7 @@ public class AuditLogServiceImpl implements AuditLogService {
         filters.put("size", request.getSize());
         // Ghi việc truy cập dữ liệu nhạy cảm; không sao chép nội dung audit vào event mới.
         audit.write("AUDIT_LOG_SEARCHED", "AUDIT_LOG_QUERY", currentUser.require().getId(),
-                Map.of(), filters, "ADMIN tra cứu Audit Log");
+                Map.of(), filters, "Tra cứu Audit Log");
 
         return new AuditLogSearchResponse(
                 result.getNumber(),
