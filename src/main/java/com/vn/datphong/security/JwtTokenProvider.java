@@ -44,7 +44,10 @@ public class JwtTokenProvider {
                 .claim("roles", authentication.getAuthorities()
                         .stream()
                         .map(GrantedAuthority::getAuthority)
+                        .filter(Permissions::isRoleAuthority)
                         .toList())
+                .claim("tokenVersion", authentication.getPrincipal() instanceof AccountPrincipal principal
+                        ? principal.getTokenVersion() : 0L)
                 .issuedAt(now)
                 .expiration(expiration)
                 .signWith(secretKey)
@@ -56,19 +59,21 @@ public class JwtTokenProvider {
         return parseClaims(token).getSubject();
     }
 
+    public Long extractTokenVersion(String token) {
+        Object version = parseClaims(token).get("tokenVersion");
+        return version instanceof Number number ? number.longValue() : null;
+    }
+
     // Kiểm tra JWT có hợp lệ và đúng người dùng không
     public boolean isTokenValid(
             String token
     ) {
         try {
             String username = extractUsername(token);
-            if(username!=null){
-                return true;
-            }
+            return username != null && !username.isBlank();
         } catch (JwtException | IllegalArgumentException ex) {
             return false;
         }
-        return true;
     }
 
     private Claims parseClaims(String token) {

@@ -32,6 +32,20 @@ public class AuditLogWriter {
             Map<String, Object> afterState,
             String operationId
     ) {
+        save("USER_UPDATED", "USER", targetUserId, beforeState, afterState,
+                "Cập nhật thông tin hồ sơ", operationId);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void write(String action, String entityType, Long entityId,
+                      Map<String, Object> beforeState, Map<String, Object> afterState,
+                      String reason) {
+        save(action, entityType, entityId, beforeState, afterState, reason, UUID.randomUUID().toString());
+    }
+
+    private void save(String action, String entityType, Long entityId,
+                      Map<String, Object> beforeState, Map<String, Object> afterState,
+                      String reason, String operationId) {
         Authentication authentication = SecurityContextHolder
                 .getContext()
                 .getAuthentication();
@@ -56,12 +70,14 @@ public class AuditLogWriter {
                 .eventId(UUID.randomUUID())
                 .actor(actor)
                 .actorType(ActorType.USER)
-                .action("USER_UPDATED")
-                .entityType("USER")
-                .entityId(targetUserId)
+                .action(action)
+                .entityType(entityType)
+                .entityId(entityId)
+                .fromStatus(beforeState.get("status") == null ? null : beforeState.get("status").toString())
+                .toStatus(afterState.get("status") == null ? null : afterState.get("status").toString())
                 .beforeState(new LinkedHashMap<>(beforeState))
                 .afterState(new LinkedHashMap<>(afterState))
-                .reason("Cập nhật thông tin hồ sơ")
+                .reason(reason)
                 .requestId(operationId)
                 .correlationId(operationId)
                 .occurredAt(Instant.now())

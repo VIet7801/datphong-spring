@@ -3,12 +3,17 @@ package com.vn.datphong.service.Impl;
 import com.vn.datphong.entity.User;
 import com.vn.datphong.enums.UserStatus;
 import com.vn.datphong.repository.UserRepository;
+import com.vn.datphong.repository.RolePermissionRepository;
+import com.vn.datphong.security.AccountPrincipal;
+import com.vn.datphong.security.Permissions;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import java.util.LinkedHashSet;
 
 /**
  * Dùng chung cho hai luồng: DaoAuthenticationProvider khi login và JWT filter ở request sau.
@@ -19,31 +24,25 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {
     private final UserRepository userRepository;
+    private final RolePermissionRepository rolePermissionRepository;
     @Override
+    @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         // 1. Tìm đúng tài khoản từ username cần xác thực.
         User user=userRepository.findByUsername(username)
                 // Đúng loại exception để login và JWT filter trả 401 khi user đã bị xóa.
                 .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy tài khoản"));
         // 2. Chuyển role trong database thành quyền của Spring Security
-        var authorities = user.getRoles().stream()
-                .map(role -> {
-                    String code = role.getCode();
-
-                    return new SimpleGrantedAuthority(code);
-                })
-                .toList();
+        var authorities = new LinkedHashSet<SimpleGrantedAuthority>();
+        user.getRoles().stream().map(role -> role.getCode())
+                .filter(Permissions::isRoleAuthority)
+                .map(SimpleGrantedAuthority::new).forEach(authorities::add);
+        // Permission là quyền nghiệp vụ, không bao giờ được giả dạng ROLE_ADMIN.
+        rolePermissionRepository.findPermissionCodesByUserId(user.getId()).stream()
+                .filter(Permissions::isPermissionAuthority)
+                .map(SimpleGrantedAuthority::new).forEach(authorities::add);
 
         // 3. Chuyển User entity thành UserDetails
-        return org.springframework.security.core.userdetails.User
-                .withUsername(user.getUsername())
-                .password(user.getPassword())
-                .authorities(authorities)
-                // Chỉ tài khoản có active=true và status=ACTIVE mới được xác thực.
-                // Boolean.TRUE.equals(...) xử lý cả dữ liệu active=null theo hướng từ chối.
-                .disabled(!Boolean.TRUE.equals(user.getActive()) || user.getStatus() != UserStatus.ACTIVE)
-                // LOCKED được ánh xạ riêng để Spring Security nhận biết tài khoản bị khóa.
-                .accountLocked(user.getStatus() == UserStatus.LOCKED)
-                .build();
+        return new AccountPrincipal(user, authorities);
     }
 }

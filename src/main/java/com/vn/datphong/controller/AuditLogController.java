@@ -8,16 +8,19 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springdoc.core.annotations.ParameterObject;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
-@RequestMapping("/api/admin/audit-logs")
+@RequestMapping({"/api/v1/admin/audit-logs", "/api/admin/audit-logs"})
 @RequiredArgsConstructor
+@Tag(name = "Admin - Audit Log")
 public class AuditLogController {
     private final AuditLogService auditLogService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<AuditLogSearchResponse>> search(
-            @Valid @ModelAttribute AuditLogSearchRequest request
+            @Valid @ParameterObject @ModelAttribute AuditLogSearchRequest request
     ) {
         AuditLogSearchResponse result = auditLogService.search(request);
         return ResponseEntity.ok(ApiResponse.success(result));

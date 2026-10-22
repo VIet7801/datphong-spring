@@ -1,200 +1,195 @@
 # Luồng request từ FE đến response
 
-Tài liệu này mô tả code hiện tại. Hai ví dụ để lần theo là
-`POST /api/auth/login` và `GET /users/findAll`.
-Swagger UI cũng là một client gửi HTTP request giống FE.
+Cập nhật theo mã nguồn ngày 22/10/2026. Xem [báo cáo User, Permission và Audit Log](BAO_CAO_USER_PERMISSION_AUDIT_LOG.md) để có đầy đủ API, quy tắc, migration và cách thử trên Swagger.
 
-## 1. Bắt đầu đọc code ở đâu?
+## 1. Sơ đồ chung
 
-`DatphongApplication.main()` chỉ khởi động Spring Boot, tạo các bean và HTTP server.
-Hàm này không chạy lại mỗi khi FE gửi request.
-
-Khi request đã đến backend, thứ tự tổng quát là:
-
-```mermaid
+~~~mermaid
 flowchart TD
-    FE[FE gửi HTTP request] --> HTTP[HTTP server nhận request]
-    HTTP --> SECURITY[Spring Security filter chain]
-    SECURITY --> JWT[JwtAuthenticationFilter: kiểm tra JWT nếu có]
-    JWT --> URL[Kiểm tra URL: permitAll hoặc authenticated]
-    URL --> MVC[DispatcherServlet chọn controller và đọc dữ liệu đầu vào]
-    MVC --> CONTROLLER[Controller gọi service]
-    CONTROLLER --> AUTHZ[Proxy kiểm tra PreAuthorize]
-    AUTHZ --> SERVICE[Thân hàm service xử lý nghiệp vụ]
-    SERVICE --> REPO[Repository và Hibernate truy vấn PostgreSQL]
-    REPO --> MAPPER[Mapper chuyển entity sang response DTO]
-    MAPPER --> WRAP[Controller bọc DTO trong ApiResponse]
-    WRAP --> JSON[Spring MVC chuyển đối tượng Java thành JSON]
-    JSON --> RESPONSE[HTTP status và response body về FE]
-```
+    A[FE hoặc Swagger gửi HTTP] --> B[Spring Security filter chain]
+    B --> C[JwtAuthenticationFilter kiểm tra JWT]
+    C --> D[CustomUserDetailsService tải trạng thái, role, permission từ DB]
+    D --> E[Kiểm tra tokenVersion và tạo Authentication]
+    E --> F[SecurityConfig kiểm tra URL]
+    F --> G[Controller nhận và validate DTO]
+    G --> H[Proxy kiểm tra PreAuthorize tại Service]
+    H --> I[Service kiểm tra phạm vi, version, chính sách]
+    I --> J[Repository và Hibernate đọc hoặc ghi DB]
+    J --> K[AuditLogWriter ghi cùng transaction khi có thay đổi]
+    K --> L[Commit transaction và trả DTO]
+    L --> M[Controller bọc ApiResponse]
+    M --> N[Spring MVC serialize JSON, trả status và body]
+~~~
 
-Sơ đồ là đường đi thành công của API user, lược bớt các filter của framework.
-JWT filter cũng truy vấn user để xác thực, trước lượt truy vấn nghiệp vụ của service.
-Khi một bước từ chối request, các bước phía sau không chạy.
+Sơ đồ mô tả request có JWT và nhánh cập nhật thành công. API đăng nhập công khai có luồng riêng ở mục 2. Với GET thông thường không có bước ghi thay đổi; riêng tra cứu audit có ghi nhật ký truy cập.
 
-| Thứ tự đọc | File | Trách nhiệm |
-|---|---|---|
-| 1 | [SecurityConfig](../src/main/java/com/vn/datphong/config/SecurityConfig.java) | Cấu hình filter chain, URL công khai, yêu cầu đăng nhập và bật method security |
-| 2 | [JwtAuthenticationFilter](../src/main/java/com/vn/datphong/security/JwtAuthenticationFilter.java) | Đọc Bearer token, kiểm tra token và tài khoản, đặt Authentication vào SecurityContext |
-| 3 | [JwtTokenProvider](../src/main/java/com/vn/datphong/security/JwtTokenProvider.java) | Tạo JWT và đọc claims qua bộ xác minh chữ ký, hạn token |
-| 4 | [CustomUserDetailsService](../src/main/java/com/vn/datphong/service/Impl/CustomUserDetailsService.java) | Đọc user, quyền và trạng thái hiện tại từ database cho Spring Security |
-| 5 | [UserController](../src/main/java/com/vn/datphong/controller/UserController.java) | Nhận tham số HTTP, gọi service và tạo đối tượng response |
-| 6 | [UserServiceImpl](../src/main/java/com/vn/datphong/service/Impl/UserServiceImpl.java) | Định nghĩa quyền bằng PreAuthorize và xử lý nghiệp vụ |
-| 7 | [UserAuthorization](../src/main/java/com/vn/datphong/security/UserAuthorization.java) | Đối chiếu ID hồ sơ với username đã xác thực khi cần kiểm tra chính chủ |
-| 8 | [UserRepository](../src/main/java/com/vn/datphong/repository/UserRepository.java) | Spring Data JPA tạo phần triển khai các truy vấn tới database |
-| 9 | [UserMapper](../src/main/java/com/vn/datphong/mapper/UserMapper.java) | Chọn các trường entity được đưa sang UsersResponse |
-| 10 | [ApiResponse](../src/main/java/com/vn/datphong/dto/response/ApiResponse.java) | Chứa success, message, data, error và timestamp |
+DatphongApplication.main() chỉ khởi động ứng dụng. SecurityConfig cấu hình filter chain khi khởi động; các filter mới xử lý từng request.
 
-`SecurityConfig` được tạo khi khởi động; không phải hàm xử lý từng request.
-Code chạy trên từng request nằm trong các filter mà cấu hình này đăng ký.
+## 2. Đăng nhập
 
-## 2. Luồng đăng nhập: POST /api/auth/login
+    POST /api/auth/login
 
-FE gửi JSON, không cần Bearer token cho lần đăng nhập đầu:
+~~~json
+{
+  "username": "tai-khoan-da-co",
+  "password": "mat-khau-nguoi-dung-nhap"
+}
+~~~
 
-```http
-POST /api/auth/login
-Content-Type: application/json
+1. JWT filter không thấy Bearer token thì cho request đi tiếp.
+2. SecurityConfig cho phép URL login công khai.
+3. AuthenticationController nhận LoginRequest và validate.
+4. AuthenticationService gọi AuthenticationManager.authenticate().
+5. DaoAuthenticationProvider gọi UserDetailsService.
+6. CustomUserDetailsService tìm User, nạp role và permission qua RolePermissionRepository.
+7. AccountPrincipal chứa danh tính, tokenVersion, trạng thái và authority. Đối tượng này chỉ dùng nội bộ.
+8. Provider kiểm tra tài khoản hoạt động và đối chiếu BCrypt.
+9. JwtTokenProvider tạo token có subject=username, roles, tokenVersion và thời hạn.
+10. Controller trả ApiResponse chứa accessToken, tokenType.
 
-{"username":"alice","password":"mat-khau-nguoi-dung-nhap"}
-```
+Claim roles chỉ chứa role. Permission dùng quyết định truy cập được tải từ DB trên từng request, không lấy từ claim do client gửi.
 
-1. `JwtAuthenticationFilter` không thấy Bearer token nên gọi `filterChain.doFilter()`.
-   Lệnh này chuyển request tới phần xử lý phía sau; không có nghĩa là bỏ kiểm tra bảo mật.
-2. Quy tắc `permitAll()` trong `SecurityConfig` cho phép URL đăng nhập đi tiếp khi chưa xác thực.
-3. Spring MVC chọn `AuthenticationController.login()`, chuyển JSON sang `LoginRequest`
-   và kiểm tra các annotation validation do `@Valid` kích hoạt.
-4. Controller gọi `AuthenticationService.login(request)`.
-5. Service tạo `UsernamePasswordAuthenticationToken` chưa xác thực và gọi
-   `AuthenticationManager.authenticate(...)`.
-6. `DaoAuthenticationProvider` gọi `CustomUserDetailsService.loadUserByUsername()`.
-   Repository tìm đúng username, rồi chuyển entity thành `UserDetails` gồm password hash,
-   authorities, trạng thái enabled/locked. `UserDetails` dùng nội bộ, không trả về FE.
-7. Provider kiểm tra trạng thái tài khoản và dùng `PasswordEncoder` kiểm tra mật khẩu.
-   Mật khẩu lưu trong database cần tương thích với encoder đã cấu hình.
-8. Khi xác thực thành công, service gọi `JwtTokenProvider.generateToken(authentication)`.
-   JWT chứa username, authorities và hạn sử dụng; không chứa password hoặc secret 2FA.
-9. Controller trả `ResponseEntity.ok(ApiResponse.customsuccess(...))` chứa `LoginResponse`.
-   Spring chuyển thành JSON, HTTP 200. FE nhận `data.accessToken` và `data.tokenType`.
+Không log password, JWT hoặc secret 2FA. Với permitAll, một Bearer token sai vẫn có thể bị JWT filter từ chối trước khi vào Controller; khi login nên gửi request không có token cũ.
 
-Các request tiếp theo cần gửi header `Authorization: Bearer <accessToken>`.
-Backend đang dùng `STATELESS`: không dựa vào HTTP session để duy trì đăng nhập giữa các request.
+## 3. Đọc hồ sơ cá nhân
 
-Lưu ý theo code hiện tại: `permitAll()` không bỏ qua JWT filter. Nếu FE gửi một Bearer
-token sai/hết hạn ngay cả tới URL login, filter vẫn có thể trả 401 trước controller.
+    GET /api/v1/users/me
+    Authorization: Bearer <accessToken>
 
-## 3. Luồng gọi API: GET /users/findAll
+1. Filter xác minh JWT, đọc username.
+2. Tải trạng thái/role/permission hiện tại từ DB.
+3. Kiểm tra active=true, status=ACTIVE và tokenVersion khớp token.
+4. Đặt Authentication vào SecurityContext.
+5. URL yêu cầu đăng nhập.
+6. UserProfileController gọi UserProfileService.getMyProfile().
+7. Service yêu cầu isAuthenticated().
+8. CurrentUser.require() xác định User từ Authentication.
+9. UserViewMapper.profile() tạo UserProfileResponse, không trả trường quản trị hay secret.
+10. Controller bọc ApiResponse; Spring MVC ghi JSON.
 
-```http
-GET /users/findAll
-Authorization: Bearer <accessToken>
-```
+Không có targetUserId trong body hoặc URL /me. Bởi vậy người gọi không đổi ID để đọc hồ sơ của người khác qua API này.
 
-1. `JwtAuthenticationFilter.doFilterInternal()` đọc header và tách token.
-2. `JwtTokenProvider` xác minh chữ ký/hạn token và đọc username.
-3. Filter gọi `CustomUserDetailsService` để lấy tài khoản và authorities hiện tại từ database.
-   Tài khoản phải có `active = true`, `status = ACTIVE`; tài khoản bị xóa/khóa/vô hiệu hóa bị từ chối.
-   Authorities được tải lại từ database, không lấy trực tiếp từ claim roles trong token.
-4. Filter tạo Authentication đã xác thực, đặt vào `SecurityContextHolder`, rồi cho request đi tiếp.
-   Context này cung cấp danh tính cho quá trình xử lý request, không phải response gửi FE.
-5. Quy tắc URL `authenticated()` cho phép request đã xác thực đi vào Spring MVC.
-6. `DispatcherServlet` chọn `UserController.findAll()` theo HTTP method và URL.
-7. Controller gọi `userService.findAll()`. Spring đi qua proxy của service để kiểm tra
-   `@PreAuthorize("hasAuthority('ROLE_ADMIN')")` trước khi chạy thân hàm.
-   Đăng nhập thành công nhưng không có ROLE_ADMIN sẽ bị từ chối 403 tại đây.
-8. Khi được phép, service gọi `userRepository.findAll()`. Spring Data JPA/Hibernate thực hiện
-   truy vấn và chuyển các bản ghi database thành entity `User`.
-9. `.stream().map(UserMapper::toResponse).toList()` chuyển từng entity thành `UsersResponse`.
-   Đây là bước chọn dữ liệu được công bố: DTO không có `password` và `twoFactorSecret`.
-10. Service trả danh sách DTO. Controller bọc danh sách bằng `ApiResponse.success(...)`.
-11. Spring MVC dùng HTTP message converter/Jackson để serialize đối tượng Java thành JSON.
-    FE nhận HTTP 200 và danh sách tại trường `data` trong JSON body.
+## 4. Sửa hồ sơ cá nhân
 
-Ví dụ cấu trúc response minh họa, không phải dữ liệu đọc từ database:
+    PATCH /api/v1/users/me
 
-```json
+~~~json
+{
+  "version": 0,
+  "fullName": "Nguyễn Văn A",
+  "phone": "0901234567"
+}
+~~~
+
+Lấy version hiện tại từ GET /me trước khi gửi. Đây chỉ là ví dụ body.
+
+1. Các bước xác thực giống mục 3.
+2. Spring đọc ProfileUpdateRequest. StrictRequest từ chối trường không được phép.
+3. Bean Validation kiểm tra version, độ dài, số điện thoại.
+4. Service lấy User từ principal và so sánh version.
+5. ChangeTracker chỉ cập nhật trường khác giá trị hiện tại.
+6. Hibernate flush SQL, tăng version.
+7. AuditLogWriter.write() ghi USER_PROFILE_UPDATED với dữ liệu đã che.
+8. Transaction commit cả User và audit; lỗi một phần làm rollback cả hai.
+9. Trả profile và version mới.
+
+Không có thay đổi thật thì không tăng version và không ghi event thay đổi. PATCH đổi mật khẩu dùng endpoint riêng /api/v1/users/me/password, bắt buộc kiểm tra mật khẩu hiện tại và thu hồi JWT cũ bằng tokenVersion.
+
+## 5. ADMIN tra danh sách User
+
+    GET /api/v1/admin/users?page=0&size=20
+    Authorization: Bearer <accessToken>
+
+1. Filter tải lại User, role, permission và kiểm tra tokenVersion.
+2. SecurityConfig yêu cầu ROLE_ADMIN cho nhóm /api/v1/admin/**.
+3. AdminUserController.search() nhận bộ lọc và phân trang.
+4. Proxy yêu cầu ROLE_ADMIN và USER_READ tại AdminUserService.search().
+5. Repository truy vấn một Slice, sắp id giảm dần.
+6. UserViewMapper.admin() che email/phone, bỏ dữ liệu xác thực.
+7. Response tại data có page, size, hasNext, items.
+
+Ví dụ cấu trúc response, không phải dữ liệu DB:
+
+~~~json
 {
   "success": true,
   "message": "Success",
-  "data": [],
+  "data": {
+    "page": 0,
+    "size": 20,
+    "hasNext": false,
+    "items": []
+  },
   "error": null,
-  "timestamp": "2026-10-16T00:00:00Z"
+  "timestamp": "2026-10-22T00:00:00Z"
 }
-```
+~~~
 
-`ApiResponse` là body, không tự quyết định HTTP status bằng trường `success`.
-HTTP status do controller/ResponseEntity/framework/exception handler quyết định.
+Ví dụ FE với biến token đã nhận từ login:
 
-Ví dụ FE đọc response thành công bằng `fetch`, với `token` đã nhận khi login:
-
-```javascript
-const response = await fetch("http://localhost:8080/users/findAll", {
-  headers: { Authorization: `Bearer ${token}` }
+~~~javascript
+const response = await fetch("http://localhost:8080/api/v1/admin/users?page=0&size=20", {
+  headers: { Authorization: "Bearer " + token }
 });
-if (!response.ok) {
-  throw new Error(`HTTP ${response.status}`);
-}
+if (!response.ok) throw new Error("HTTP " + response.status);
 const body = await response.json();
-const users = body.data;
-```
+const users = body.data.items;
+~~~
 
-Nếu dùng Axios, `response.data` là toàn bộ JSON body; danh sách user nằm ở
-`response.data.data` vì bên trong có thêm lớp bọc `ApiResponse`.
+Nếu dùng Axios, danh sách nằm tại response.data.data.items.
 
-## 4. Xem và sửa hồ sơ cá nhân
+## 6. ADMIN cập nhật trạng thái hoặc role
 
-`GET /users/detail/{id}` và `PUT /users/update/{id}` dùng điều kiện tại method service:
+- PATCH /api/v1/admin/users/{id}/status: ROLE_ADMIN + USER_MANAGE.
+- PUT /api/v1/admin/users/{id}/roles: ROLE_ADMIN + USER_ROLE_MANAGE.
+- Body có version và reason; mỗi thao tác có DTO riêng.
+- Service lấy khóa quản trị, kiểm tra tự sửa quyền, phạm vi ủy quyền và admin cuối cùng.
+- Cập nhật User, tăng tokenVersion và ghi audit cùng transaction.
+- Tài khoản bị tác động phải đăng nhập lại. Mở khóa không làm JWT cũ hợp lệ trở lại.
 
-```java
-@PreAuthorize("hasAuthority('ROLE_ADMIN') or @userAuthorization.isOwner(#id, authentication)")
-```
+Đổi permission của role có API PUT /api/v1/admin/roles/{id}/permissions. Quyền mới được nạp ở request kế tiếp. Chặn sửa permission của role đang gắn với chính người thao tác.
 
-- ADMIN được phép truy cập hồ sơ theo ID.
-- Với tài khoản khác, `UserAuthorization.isOwner()` đối chiếu ID trên URL và
-  `authentication.getName()` bằng `existsByIdAndUsername(...)`.
-- Username dùng xác định chủ sở hữu lấy từ Authentication, không lấy từ JSON do FE gửi.
-- Với PUT, Spring chuyển body sang `UsersResquest` và validation trước khi controller gọi service.
-- Controller update hiện gọi `getById()` để kiểm tra tồn tại rồi mới gọi `update()`;
-  cả hai lời gọi đều qua kiểm tra quyền ở service. Khi debug sẽ thấy lượt đọc hồ sơ trước lượt cập nhật.
-- Chỉ sau khi được cấp quyền, service mới đọc và thay đổi entity. `@Transactional` ở `update()`
-  cho phép Hibernate ghi các thay đổi của entity được quản lý khi transaction commit.
-  Việc gán field trong Java không đồng nghĩa SQL đã commit ngay tại dòng đó.
+## 7. Chỉ ADMIN tra Audit Log
 
-## 5. Nếu request bị lỗi thì dừng ở đâu?
+Hai URL cùng chính sách:
 
-| Trường hợp | Nơi xử lý hiện tại | Kết quả chính |
+    GET /api/v1/admin/audit-logs
+    GET /api/admin/audit-logs
+
+Filter yêu cầu ROLE_ADMIN; Service yêu cầu thêm AUDIT_READ. SUPPORT có AUDIT_READ vẫn nhận 403 theo yêu cầu hiện tại.
+
+Service validate bộ lọc, truy vấn Slice, tạo response và ghi AUDIT_LOG_SEARCHED. Không đếm request HTTP.
+
+## 8. Nhánh lỗi
+
+| Trường hợp | Nơi xử lý | HTTP |
 |---|---|---|
-| API cần đăng nhập nhưng không có token | Filter chain, AuthenticationEntryPoint trong SecurityConfig | HTTP 401, chưa vào controller |
-| Token sai/hết hạn hoặc tài khoản đã khóa/vô hiệu hóa/bị xóa | JwtAuthenticationFilter | HTTP 401, chưa vào controller |
-| Sai mật khẩu hoặc tài khoản không được phép đăng nhập | DaoAuthenticationProvider, rồi exception handler của MVC | HTTP 401, không tạo JWT mới |
-| Đã đăng nhập nhưng thiếu quyền/chưa phải chính chủ | Proxy kiểm tra PreAuthorize, rồi GlobalExceptionHandler | HTTP 403, không chạy thân hàm service bị chặn |
-| DTO không vượt qua validation | Spring MVC và exception handler | HTTP 400, không chạy thân hàm controller |
-| User không tồn tại và người gọi có quyền kiểm tra | Service ném ResourceNotFoundExcept, exception handler của MVC xử lý | HTTP 404 |
+| Không đăng nhập | Filter chain / AuthenticationEntryPoint | 401 |
+| JWT sai/hết hạn, tokenVersion cũ, tài khoản không hoạt động | JWT filter | 401 |
+| Sai mật khẩu login | DaoAuthenticationProvider / advice | 401 |
+| Thiếu role/permission hoặc vượt phạm vi ủy quyền | Filter chain hoặc proxy Service | 403 |
+| Trường thừa, dữ liệu sai, tham số sai | MVC / GlobalExceptionHandler | 400 |
+| User hoặc API không tồn tại | Service hoặc MVC / advice | 404 |
+| Version cũ | Service hoặc JPA / advice | 409 |
+| Trùng username/email, role/permission không thể xóa | Service hoặc JPA / advice | 409 |
 
-Không phải mọi lỗi đều đi qua `GlobalExceptionHandler`. JWT filter và các handler trong
-`SecurityConfig` gọi `response.sendError(...)`, nên body lỗi không được đảm bảo có dạng ApiResponse.
-Với lỗi trong MVC, dự án hiện có cả `GlobalExceptionHandler` và `GlobalExeptionHander`
-cùng xử lý một số loại exception; format body của các lỗi trùng handler chưa được thống nhất.
-Tài liệu này ghi nhận hiện trạng, chưa thay đổi cơ chế xử lý lỗi.
+GlobalExceptionHandler là advice MVC duy nhất cho các lỗi trên. Lỗi từ filter dùng sendError nên body có thể khác ApiResponse.
 
-## 6. Đặt breakpoint trong IntelliJ
+ApiResponse là body; HTTP status do Controller/ResponseEntity/framework/handler quyết định.
 
-Chạy `Debug DatphongApplication`, rồi gửi request từ FE/Swagger. Dùng F8 để đi qua dòng,
-F7 để đi vào hàm, F9 để chạy tới breakpoint tiếp theo.
+## 9. Đặt breakpoint trong IntelliJ
 
-| Thứ tự | Đặt breakpoint tại | Cần quan sát |
-|---|---|---|
-| 1 | JwtAuthenticationFilter.doFilterInternal | URI, có Bearer token không, request có bị return sớm không |
-| 2 | CustomUserDetailsService.loadUserByUsername | Đúng username, authorities và trạng thái tài khoản không |
-| 3 | AuthenticationService.login (khi đăng nhập) | Kết quả authenticate, chỉ tạo JWT sau khi xác thực thành công |
-| 4 | UserController.findAll | Request đã vượt qua kiểm tra ở filter chain |
-| 5 | UserAuthorization.isOwner (khi xem/sửa hồ sơ bằng user thường) | ID trên URL có thuộc username đã xác thực không |
-| 6 | UserServiceImpl.findAll hoặc update | Nếu thiếu quyền thì breakpoint trong thân hàm service không được chạm tới |
-| 7 | UserMapper.toResponse | Entity đầu vào và các trường DTO đầu ra |
-| 8 | ApiResponse.success/customsuccess hoặc GlobalExceptionHandler | Body thành công hoặc lỗi trước khi Spring serialize |
+| Vị trí | Cần quan sát |
+|---|---|
+| JwtAuthenticationFilter.doFilterInternal | URI, nhánh từ chối, tokenVersion |
+| CustomUserDetailsService.loadUserByUsername | User, role và permission hiện tại |
+| AuthenticationService.login | Kết quả authenticate; chỉ tạo token sau thành công |
+| UserProfileController hoặc AdminUserController | DTO/bộ lọc đã validate |
+| CurrentUser.require | Username lấy từ Authentication |
+| UserProfileService/AdminUserService/AdminRoleService/PermissionService | Quyền đã qua proxy; version, phạm vi, thay đổi thực tế |
+| RbacPolicy | Tự sửa quyền, ủy quyền, admin cuối cùng |
+| AuditLogWriter.write | Actor, action, entity, before/after đã che |
+| UserViewMapper | Trường nào được trả cho từng đối tượng |
+| ApiResponse / GlobalExceptionHandler | Body trước khi Spring serialize |
 
-Không cần đặt breakpoint trong implementation của `UserRepository`: Spring Data tạo nó tự động.
-Có thể đặt tại dòng gọi repository trong service và xem kết quả sau khi bước qua dòng đó.
-Không đưa password, JWT hoặc secret 2FA vào log khi debug.
-
-Tham khảo: [Spring Security Servlet Architecture](https://docs.spring.io/spring-security/reference/servlet/architecture.html).
+Thiếu permission thì breakpoint trong thân phương thức Service bị chặn sẽ không được chạm tới. Spring Data tự tạo implementation của Repository; đặt breakpoint ở dòng gọi repository trong Service là đủ để học luồng.

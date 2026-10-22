@@ -8,6 +8,14 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import jakarta.persistence.OptimisticLockException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -15,10 +23,35 @@ import java.util.Map;
 /**
  * Nhánh trả lỗi của Spring MVC khi controller/service ném exception hoặc validation thất bại.
  * Lỗi filter trả bằng response.sendError(...) không được tự động bọc bởi advice này.
- * GlobalExeptionHander hiện cũng xử lý một số exception trùng loại; xem docs/REQUEST_FLOW.md.
+ * Dùng một advice thống nhất cho lỗi controller/service.
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
+    public ResponseEntity<ApiResponse<?>> handleMissingEndpoint(Exception ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(
+                "API hoac tai nguyen khong ton tai", new ApiError("RESOURCE_NOT_FOUND", null)));
+    }
+
+    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class,
+            HandlerMethodValidationException.class})
+    public ResponseEntity<ApiResponse<?>> handleInvalidInput(Exception ex) {
+        return ResponseEntity.badRequest().body(ApiResponse.error(
+                "Du lieu khong hop le hoac chua truong khong duoc phep", new ApiError("VALIDATION_ERROR", null)));
+    }
+
+    @ExceptionHandler({ObjectOptimisticLockingFailureException.class, OptimisticLockException.class})
+    public ResponseEntity<ApiResponse<?>> handleVersionConflict(Exception ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(
+                "Du lieu da thay doi, hay tai lai", new ApiError("VERSION_CONFLICT", null)));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<?>> handleIntegrityConflict(DataIntegrityViolationException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(
+                "Du lieu trung hoac dang duoc su dung", new ApiError("DATA_CONFLICT", null)));
+    }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<?>> handleAccessDenied(AccessDeniedException ex) {
@@ -98,7 +131,7 @@ public class GlobalExceptionHandler {
                 .status(ex.getStatus())
                 .body(ApiResponse.error(
                         ex.getMessage(),
-                        new ApiError("BUSINESS_ERROR", ex.getMessage())
+                        new ApiError(ex.getCode(), ex.getMessage())
                 ));
     }
 
@@ -108,7 +141,7 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error(
                         "Loi he thong",
-                        new ApiError("INTERNAL_SERVER_ERROR", ex.getMessage())
+                        new ApiError("INTERNAL_SERVER_ERROR", null)
                 ));
     }
 }

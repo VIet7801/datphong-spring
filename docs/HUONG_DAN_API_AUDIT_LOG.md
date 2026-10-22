@@ -1,5 +1,7 @@
 **Bài thực hành: ghi và tìm kiếm Audit Log nghiệp vụ**
 
+> Cập nhật 22/10/2026: mã nguồn đã được triển khai và tách User/Permission theo [báo cáo hiện hành](BAO_CAO_USER_PERMISSION_AUDIT_LOG.md). Các đoạn UserServiceImpl dưới đây là phiên bản bài học trước thay đổi; đọc báo cáo để dùng đúng class/API hiện tại. Quyền tra cứu hiện là ROLE_ADMIN và AUDIT_READ.
+
 Bản hướng dẫn này được chỉnh theo yêu cầu chỉ làm Audit Log nghiệp vụ. Ta dùng Entity AuditLog và bảng audit_logs đã có trong dự án. Bài học tập trung vào việc biết ai đã làm gì, tác động tới đối tượng nào, khi nào và thay đổi dữ liệu ra sao.
 
 Đây là tài liệu để bạn tự thực hành trong IntelliJ. Các file Java trong code block là mẫu để áp dụng, chưa được tự động cài đặt vào source ứng dụng. Việc sửa tài liệu không thực thi SQL trên database.

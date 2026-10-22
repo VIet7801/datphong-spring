@@ -2,6 +2,11 @@
 
 Spring Boot API for room booking.
 
+Đã tách API hồ sơ cá nhân và quản trị User, bổ sung Permission và giới hạn Audit Log
+cho ADMIN có AUDIT_READ. Xem [báo cáo triển khai và hướng dẫn Swagger](docs/BAO_CAO_USER_PERMISSION_AUDIT_LOG.md).
+Với DB đã có schema, chạy .\cap-nhat-rbac.cmd để bổ sung catalog/grant;
+dùng -VerifyOnly để kiểm chứng. Khởi động lại backend và đăng nhập lấy JWT mới sau cập nhật.
+
 Đọc [luồng request từ FE đến response](docs/REQUEST_FLOW.md) để biết thứ tự xử lý,
 vai trò từng lớp và vị trí đặt breakpoint khi debug đăng nhập hoặc API user.
 
@@ -130,7 +135,7 @@ The default local configuration uses:
 
 ## Account status and existing databases
 
-`UserStatus` contains only `ACTIVE`, `IN_ACTIVE`, and `LOCKED`.
+`UserStatus` contains `ACTIVE`, `IN_ACTIVE`, `LOCKED`, and `PENDING_VERIFICATION`.
 Login and authenticated API requests require both `active = true` and
 `status = ACTIVE`. A null `active` flag is treated as disabled. Locked or disabled
 accounts cannot use previously issued JWTs while they remain locked or disabled.

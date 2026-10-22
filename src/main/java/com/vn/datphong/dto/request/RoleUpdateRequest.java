@@ -1,17 +1,21 @@
 package com.vn.datphong.dto.request;
 
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.NoArgsConstructor;
 
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class RoleUpdateRequest {
+public class RoleUpdateRequest extends VersionedReasonRequest {
 
+    @NotBlank
     @Size(max = 100, message = "name không được quá 100 ký tự")
     private String name;
 

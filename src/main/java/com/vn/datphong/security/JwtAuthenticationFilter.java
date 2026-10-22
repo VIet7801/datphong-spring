@@ -97,6 +97,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                 return;
                             }
 
+                            // Lock/unlock hoặc đổi role làm tokenVersion tăng: JWT cũ không dùng lại được.
+                            if (!(userDetails instanceof AccountPrincipal principal)
+                                    || !java.util.Objects.equals(
+                                            jwtTokenProvider.extractTokenVersion(token), principal.getTokenVersion())) {
+                                SecurityContextHolder.clearContext();
+                                response.sendError(HttpServletResponse.SC_UNAUTHORIZED,
+                                        "Phiên đăng nhập đã bị thu hồi; hãy đăng nhập lại");
+                                return;
+                            }
+
                             // Bước 6: Tạo Authentication đã được xác minh bằng JWT.
                             UsernamePasswordAuthenticationToken authentication =
                                     new UsernamePasswordAuthenticationToken(

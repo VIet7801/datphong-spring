@@ -7,6 +7,7 @@ import com.vn.datphong.entity.User;
 import com.vn.datphong.enums.UserStatus;
 import com.vn.datphong.exception.GlobalExceptionHandler;
 import com.vn.datphong.repository.UserRepository;
+import com.vn.datphong.repository.RolePermissionRepository;
 import com.vn.datphong.service.AuthenticationService;
 import com.vn.datphong.service.Impl.CustomUserDetailsService;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,7 +17,8 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.context.TestComponent;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -52,7 +54,7 @@ class UserAccountStatusTest {
             {"username":"alice","password":"test-password"}
             """;
 
-    @Configuration
+    @TestConfiguration
     @EnableWebMvc
     @EnableWebSecurity
     @Import({SecurityConfig.class, CustomUserDetailsService.class, AuthenticationService.class,
@@ -64,6 +66,11 @@ class UserAccountStatusTest {
         }
 
         @Bean
+        RolePermissionRepository rolePermissionRepository() {
+            return mock(RolePermissionRepository.class);
+        }
+
+        @Bean
         JwtTokenProvider jwtTokenProvider() {
             byte[] key = new byte[32];
             new SecureRandom().nextBytes(key);
@@ -72,6 +79,7 @@ class UserAccountStatusTest {
     }
 
     @RestController
+    @TestComponent
     static class ProtectedEndpoint {
         @GetMapping("/account-status-test")
         Map<String, Boolean> protectedResource() {
@@ -82,7 +90,7 @@ class UserAccountStatusTest {
     @Autowired private WebApplicationContext context;
     @Autowired private UserRepository repository;
     @Autowired private PasswordEncoder encoder;
-    @Autowired private CustomUserDetailsService detailsService;
+    @Autowired private org.springframework.security.core.userdetails.UserDetailsService detailsService;
     @Autowired private JwtTokenProvider tokens;
     private final AtomicReference<User> currentUser = new AtomicReference<>();
     private MockMvc mvc;
@@ -152,6 +160,16 @@ class UserAccountStatusTest {
         assertFalse(detailsService.loadUserByUsername("alice").isAccountNonLocked());
         mvc.perform(get("/account-status-test").header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void incrementedTokenVersionRejectsOldTokenEvenAfterAccountIsUnlocked() throws Exception {
+        String oldToken = tokenForActiveUser();
+        currentUser.get().setTokenVersion(1L);
+        mvc.perform(get("/account-status-test").header("Authorization", "Bearer " + oldToken))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/account-status-test").header("Authorization", "Bearer " + tokenForActiveUser()))
+                .andExpect(status().isOk());
     }
 
     @Test

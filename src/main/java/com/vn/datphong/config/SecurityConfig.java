@@ -3,7 +3,7 @@ package com.vn.datphong.config;
 import com.vn.datphong.security.JwtAuthenticationFilter;
 
 import com.vn.datphong.security.JwtTokenProvider;
-import com.vn.datphong.service.Impl.CustomUserDetailsService;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -37,7 +37,7 @@ public class SecurityConfig {
     // Provider dùng UserDetailsService để tải user và PasswordEncoder để đối chiếu mật khẩu lúc login.
     @Bean
     public DaoAuthenticationProvider daoAuthenticationProvider(
-            CustomUserDetailsService userDetailsService,
+            UserDetailsService userDetailsService,
             PasswordEncoder passwordEncoder
     ) {
         DaoAuthenticationProvider provider =
@@ -59,7 +59,7 @@ public class SecurityConfig {
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter(
             JwtTokenProvider jwtProvider,
-            CustomUserDetailsService userDetailsService
+            UserDetailsService userDetailsService
     ) {
         return new JwtAuthenticationFilter(
                 jwtProvider,
@@ -105,7 +105,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler)
                 )
 
-                // Kiểm tra ở mức URL, trước controller. Quyền ADMIN/chính chủ nằm ở service.
+                // Mọi API quản trị yêu cầu ADMIN; service kiểm tra thêm permission từng thao tác.
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/auth/login",
@@ -115,6 +115,8 @@ public class SecurityConfig {
                                 "/v3/api-docs",
                                 "/v3/api-docs/**"
                         ).permitAll()
+                        .requestMatchers("/api/v1/admin/**", "/api/admin/**")
+                        .hasAuthority("ROLE_ADMIN")
                         .anyRequest().authenticated()
                 )
 
