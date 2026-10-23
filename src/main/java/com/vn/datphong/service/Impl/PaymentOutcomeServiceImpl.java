@@ -93,6 +93,7 @@ public class PaymentOutcomeServiceImpl implements PaymentOutcomeService {
         p.setProviderReference(o.reference());
         p.setGatewayTransactionRef(o.reference());
         p.setCapturedAt(now);
+        p.setCapturedAmount(p.getAmount());
         p.setFailureCode(null);
         p.setFailureMessage(null);
     }

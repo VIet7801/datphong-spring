@@ -54,7 +54,7 @@ Kết quả chạy thực tế ngày 20/10/2026 trên `vivu` tại `localhost:54
 
 - `mvnw.cmd -B -ntp test`: BUILD SUCCESS, 22 test, 0 failure/error, 3 test tích hợp được bỏ qua theo cấu hình mặc định.
 - Bật `DATPHONG_SCHEMA_VALIDATE=true` và chạy `EntitySchemaTest#everyMappedTableAndColumnValidatesAgainstLocalDatabase`: PASS, Hibernate validate schema và đọc các entity ở đủ 74 bảng. Các trường JSON dùng object tương thích `Map<String, Object>`.
-- Gọi `POST /api/auth/login` thực tế: 10/10 tài khoản trả HTTP 200, JWT có username/role đúng; mật khẩu sai trả HTTP 401. Server tạm phục vụ kiểm tra ở cổng 18080 đã được dừng.
+- Kết quả trước thay đổi xác minh ngày 23/10/2026: gọi `POST /api/auth/login` cho 10/10 tài khoản trả HTTP 200; mật khẩu sai trả HTTP 401. Hiện tài khoản còn phải có `verified_at`, JWT dùng userId làm subject; xem [luồng A–Z](BAO_CAO_USER_PERMISSION_AUDIT_LOG.md). Server thử cổng 18080 đã dừng.
 - Chạy lại seed: số dòng và digest nội dung của tất cả bảng `public`/`datphong_schema`, cùng nội dung file tài khoản đều giữ nguyên.
 - Kiểm tra độc lập: chuỗi trạng thái liên tục, số khách không vượt sức chứa, đủ từng đêm, refund nối đúng payment/booking, sequence hội thoại và sender là participant đều hợp lệ.
 

@@ -1,4 +1,15 @@
 spring:
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS:false}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5435/vivu}
     username: ${SPRING_DATASOURCE_USERNAME:vephim}
@@ -53,6 +64,9 @@ springdoc:
     url: /v3/api-docs
     operations-sorter: method
     tags-sorter: alpha
+logging:
+  level:
+    org.hibernate.orm.jdbc.error: 'OFF'
 jwt:
     secret: ${JWT_SECRET:l75KeZzOvj59cLmq0/toOfAG8IfadlSm6au8JME4Qyw=}
     expiration-ms: ${JWT_EXPIRATION_MS:900000}

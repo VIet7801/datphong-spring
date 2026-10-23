@@ -39,6 +39,13 @@ public interface RefundRequestRepository extends JpaRepository<RefundRequest, Lo
     @Query("select coalesce(sum(r.amount), 0) from RefundRequest r where r.payment.id = :paymentId and r.status <> com.vn.datphong.enums.RefundStatusType.REJECTED")
     BigDecimal sumCommitted(@Param("paymentId") Long paymentId);
 
+    @Query("select coalesce(sum(r.amount), 0) from RefundRequest r where r.payment.id = :paymentId and r.status = com.vn.datphong.enums.RefundStatusType.SUCCEEDED")
+    BigDecimal sumSucceeded(@Param("paymentId") Long paymentId);
+
+    /** Hai bảng refund cùng tồn tại: dữ liệu ở bảng lõi phải được đối soát trước khi chạy luồng tương thích. */
+    @Query("select count(r) > 0 from Refund r where r.payment.id = :paymentId")
+    boolean hasCoreRefunds(@Param("paymentId") Long paymentId);
+
     @Query(value = "select r from RefundRequest r where r.status in :statuses order by r.id desc",
             countQuery = "select count(r) from RefundRequest r where r.status in :statuses")
     Page<RefundRequest> findByStatuses(@Param("statuses") Collection<RefundStatusType> statuses, Pageable pageable);

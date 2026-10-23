@@ -1,7 +1,8 @@
 param(
     [string]$JavaHome = $env:JAVA_HOME,
     [string]$JdbcJar,
-    [switch]$VerifyOnly
+    [switch]$VerifyOnly,
+    [switch]$SchemaOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -41,9 +42,16 @@ try {
     New-Item -ItemType Directory -Path $classes -Force | Out-Null
     & (Join-Path $JavaHome 'bin/javac.exe') -encoding UTF-8 -d $classes 'scripts/java/SchemaTool.java' 'scripts/java/RbacCatalogTool.java'
     if ($LASTEXITCODE -ne 0) { throw 'Cannot compile the RBAC tool.' }
-    $mode = if ($VerifyOnly) { 'verify' } else { 'apply' }
-    & (Join-Path $JavaHome 'bin/java.exe') '-Dfile.encoding=UTF-8' -cp "$classes;$JdbcJar" RbacCatalogTool $mode
-    if ($LASTEXITCODE -ne 0) { throw 'RBAC update/verification failed.' }
+    if ($SchemaOnly) {
+        if ($VerifyOnly) { throw 'Use Maven EntitySchemaTest to validate the schema.' }
+        & (Join-Path $JavaHome 'bin/java.exe') '-Dfile.encoding=UTF-8' -cp "$classes;$JdbcJar" SchemaTool apply 'scripts/sql/V006__runtime_schema_alignment.sql'
+        if ($LASTEXITCODE -ne 0) { throw 'Runtime schema update failed.' }
+        & (Join-Path $JavaHome 'bin/java.exe') '-Dfile.encoding=UTF-8' -cp "$classes;$JdbcJar" SchemaTool apply 'scripts/sql/V007__refund_request_idempotency.sql'
+    } else {
+        $mode = if ($VerifyOnly) { 'verify' } else { 'apply' }
+        & (Join-Path $JavaHome 'bin/java.exe') '-Dfile.encoding=UTF-8' -cp "$classes;$JdbcJar" RbacCatalogTool $mode
+    }
+    if ($LASTEXITCODE -ne 0) { throw 'Database update/verification failed.' }
 }
 finally {
     Pop-Location

@@ -3,6 +3,7 @@ package com.vn.datphong.dto.request;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
+import com.vn.datphong.util.EmailAddress;
 
 @Getter
 @Setter
@@ -15,6 +16,8 @@ public class AdminUserCreateRequest extends StrictRequest {
     @Email
     @Size(max = 150)
     private String email;
+
+    public void setEmail(String email) { this.email = EmailAddress.normalize(email); }
 
     @NotBlank
     @Size(min = 4, max = 50)

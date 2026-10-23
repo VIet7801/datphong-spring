@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import static org.junit.jupiter.api.Assertions.*;
 
 class EntitySchemaTest {
+    private static final int ENTITY_COUNT = 78; // Catalog gốc 74 + 4 entity Fake Bank/webhook.
     private Configuration models() throws Exception {
         Configuration config = new Configuration();
         config.setProperty("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
@@ -41,12 +42,16 @@ class EntitySchemaTest {
         config.setProperty("jakarta.persistence.schema-generation.scripts.action", "create");
         config.setProperty("jakarta.persistence.schema-generation.scripts.create-target", script.toString());
         try (SessionFactory factory = config.buildSessionFactory()) {
-            assertEquals(74, factory.getMetamodel().getEntities().size());
+            assertEquals(ENTITY_COUNT, factory.getMetamodel().getEntities().size());
         }
         String sql = Files.readString(script);
         assertTrue(sql.contains("create table room_allocations"));
         assertTrue(sql.contains("daterange"));
         assertTrue(sql.contains("create table verification_tokens"));
+        assertTrue(sql.contains("create table fakebank_accounts"));
+        assertTrue(sql.contains("create table fakebank_transactions"));
+        assertTrue(sql.contains("create table fakebank_webhook_events"));
+        assertTrue(sql.contains("create table payment_webhook_events"));
     }
 
     @Test
@@ -92,12 +97,14 @@ class EntitySchemaTest {
                     statement.execute("SET LOCAL search_path TO " + schema + ", public");
                     statement.execute(Files.readString(Path.of("scripts/sql/V000__empty_database_baseline.sql")));
                     statement.execute(Files.readString(Path.of("scripts/sql/V002__complete_catalog_constraints.sql")));
+                    statement.execute(Files.readString(Path.of("scripts/sql/V006__runtime_schema_alignment.sql")));
+                    statement.execute(Files.readString(Path.of("scripts/sql/V007__refund_request_idempotency.sql")));
                 }
                 connection.commit();
                 Configuration config = liveConfiguration();
                 config.setProperty("hibernate.default_schema", schema);
                 try (SessionFactory factory = config.buildSessionFactory()) {
-                    assertEquals(74, factory.getMetamodel().getEntities().size());
+                    assertEquals(ENTITY_COUNT, factory.getMetamodel().getEntities().size());
                 }
             } finally {
                 connection.rollback();
@@ -161,23 +168,101 @@ class EntitySchemaTest {
                 RoomAllocation allocation = RoomAllocation.builder().booking(booking).room(room)
                         .checkinDate(stay.from()).checkoutDate(stay.to()).build();
                 session.persist(allocation);
-                Payment payment = Payment.builder().booking(booking).merchantId("schema-test").amount(new BigDecimal("100.00"))
-                        .idempotencyKey(key).requestHash(key).intentExpiresAt(Instant.now().plusSeconds(600))
-                        .correlationId(key).build();
+                Payment payment = Payment.builder().booking(booking).amount(new BigDecimal("100.00"))
+                        .status(PaymentStatusType.INITIATED)
+                        .idempotencyKey(key).requestHash(key).build();
                 session.persist(payment);
+                session.persist(BookingStatusHistory.builder().booking(booking).toStatus(BookingStatusType.HOLD)
+                        .source(BookingStatusChangeSource.CUSTOMER).actor(customer).reason("Mapping test").build());
+                session.persist(OutboxEvent.builder().eventType("BOOKING_CREATED").aggregateType("BOOKING")
+                        .aggregateId(booking.getId()).payload("{\"bookingId\":" + booking.getId() + "}")
+                        .availableAt(LocalDateTime.now(ZoneOffset.UTC)).build());
                 session.persist(VerificationToken.builder().user(customer).purpose(VerificationPurpose.EMAIL_VERIFICATION)
                         .tokenHash(key).expiresAt(Instant.now().plusSeconds(600)).build());
                 session.persist(RefreshToken.builder().user(customer).familyId(UUID.randomUUID())
                         .tokenHash(key).expiresAt(Instant.now().plusSeconds(600)).build());
                 session.flush();
+                assertEquals("FAKE_BANK_DEBIT", session.createNativeQuery(
+                        "select method from payments where id=:id", String.class)
+                        .setParameter("id", payment.getId()).getSingleResult());
+                payment.setStatus(PaymentStatusType.FAILED);
+                session.flush();
+                assertEquals(false, session.createNativeQuery("select is_open from payments where id=:id", Boolean.class)
+                        .setParameter("id", payment.getId()).getSingleResult());
                 Long allocationId = allocation.getId();
                 session.clear();
                 RoomAllocation storedAllocation = session.find(RoomAllocation.class, allocationId);
                 assertEquals(stay.from(), storedAllocation.getCheckinDate());
                 assertEquals(stay.to(), storedAllocation.getCheckoutDate());
                 assertNotNull(session.find(UserRole.class, new UserRoleId(customer.getId(), role.getId())).getAssignedAt());
+                assertEquals(PaymentMethodType.FAKE_BANK, session.find(Payment.class, payment.getId()).getMethod());
             } finally {
                 transaction.rollback();
+            }
+        }
+    }
+
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "DATPHONG_SCHEMA_VALIDATE", matches = "true")
+    void bookingSnapshotRoundTripsAsJsonbWithoutChangingBusinessData() throws Exception {
+        String yaml = Files.readString(Path.of("src/main/resources/application.yaml"));
+        String schema = "booking_snapshot_test_" + UUID.randomUUID().toString().replace("-", "");
+        try (Connection db = DriverManager.getConnection(setting(yaml, "SPRING_DATASOURCE_URL"),
+                setting(yaml, "SPRING_DATASOURCE_USERNAME"), setting(yaml, "SPRING_DATASOURCE_PASSWORD"))) {
+            try (Statement statement = db.createStatement()) {
+                statement.execute("CREATE SCHEMA " + schema);
+            }
+            try {
+                Configuration config = liveConfiguration();
+                config.setProperty("hibernate.default_schema", schema);
+                config.setProperty("hibernate.hbm2ddl.auto", "create");
+                try (SessionFactory factory = config.buildSessionFactory(); var session = factory.openSession()) {
+                    var tx = session.beginTransaction();
+                    try {
+                        String key = UUID.randomUUID().toString().substring(0, 18);
+                        User customer = User.builder().username(key).email(key + "@example.invalid")
+                                .fullName("Snapshot test").password("test-hash").active(false).build();
+                        session.persist(customer);
+                        Property property = Property.builder().owner(customer).name("Snapshot test").city("Test")
+                                .addressLine("Test").checkInFrom(LocalTime.of(14, 0))
+                                .checkOutUntil(LocalTime.NOON).build();
+                        session.persist(property);
+                        RoomTypeEntity type = RoomTypeEntity.builder().property(property).code(key)
+                                .name("Double").bedType("DOUBLE").maxGuests(2).build();
+                        session.persist(type);
+                        Room room = Room.builder().property(property).roomTypeEntity(type).code(key).build();
+                        session.persist(room);
+                        var policy = com.vn.datphong.util.CancellationPolicySnapshot.of("Linh hoạt",
+                                ZoneId.of("Asia/Bangkok"), LocalTime.of(14, 0), List.of(
+                                new com.vn.datphong.util.CancellationPolicySnapshot.Rule(7, new BigDecimal("100")),
+                                new com.vn.datphong.util.CancellationPolicySnapshot.Rule(0, BigDecimal.ZERO)));
+                        Booking booking = Booking.builder().bookingCode(key).user(customer).property(property)
+                                .roomType(type).room(room).checkinDate(LocalDate.of(2027, 1, 1))
+                                .checkoutDate(LocalDate.of(2027, 1, 2))
+                                .expiresAt(LocalDateTime.now(ZoneOffset.UTC).plusMinutes(10))
+                                .subtotalAmount(new BigDecimal("100.00")).totalPrice(new BigDecimal("100.00"))
+                                .priceVersion(1L).cancellationPolicySnapshot(policy.serialize()).build();
+                        session.persist(booking);
+                        session.flush();
+                        assertEquals("object", session.createNativeQuery(
+                                "select jsonb_typeof(cancellation_policy_snapshot) from " + schema + ".bookings where id=:id",
+                                String.class).setParameter("id", booking.getId()).getSingleResult());
+                        Long id = booking.getId();
+                        session.clear();
+                        var restored = com.vn.datphong.util.CancellationPolicySnapshot.parse(
+                                session.find(Booking.class, id).getCancellationPolicySnapshot());
+                        assertEquals(policy.getName(), restored.getName());
+                        assertEquals(policy.getRules(), restored.getRules());
+                    } finally {
+                        tx.rollback();
+                    }
+                }
+            } finally {
+                if (!schema.matches("booking_snapshot_test_[a-f0-9]{32}")) throw new IllegalStateException("Unsafe schema");
+                try (Statement statement = db.createStatement()) {
+                    statement.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE");
+                }
             }
         }
     }

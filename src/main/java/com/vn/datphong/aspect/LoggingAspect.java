@@ -28,7 +28,8 @@ public class LoggingAspect {
             return result;
         } catch (Throwable ex) {
             LocalDateTime errorTime = LocalDateTime.now();
-            log.error("{} phát sinh lỗi lúc {}", methodName, errorTime.format(FORMATTER), ex);
+            // Advice xử lý lỗi chịu trách nhiệm log; không lặp lại DB exception chứa dữ liệu nhạy cảm.
+            log.warn("{} phát sinh {} lúc {}", methodName, ex.getClass().getSimpleName(), errorTime.format(FORMATTER));
             throw ex;
         }
     }

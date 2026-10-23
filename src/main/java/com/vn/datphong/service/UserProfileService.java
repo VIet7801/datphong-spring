@@ -14,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.vn.datphong.service.identity.AccountSessionService;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +24,7 @@ public class UserProfileService {
     private final UserRepository users;
     private final AuditLogWriter audit;
     private final PasswordEncoder passwordEncoder;
+    private final AccountSessionService sessions;
 
     @Transactional(readOnly = true)
     public UserProfileResponse getMyProfile() {
@@ -54,9 +56,10 @@ public class UserProfileService {
 
     @Transactional
     public UserProfileResponse changePassword(PasswordChangeRequest request) {
-        User user = currentUser.require();
+        User user = currentUser.requireForUpdate();
         ChangeTracker.requireVersion(user.getVersion(), request.getVersion());
-        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+        if (request.getCurrentPassword().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72
+                || !passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
             throw new BadRequestExcept("Mật khẩu hiện tại không đúng");
         }
         if (request.getNewPassword().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72) {
@@ -66,7 +69,7 @@ public class UserProfileService {
             throw new BadRequestExcept("Mật khẩu mới phải khác mật khẩu hiện tại");
         }
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
-        user.setTokenVersion(user.getTokenVersion() + 1);
+        sessions.revokeAll(user);
         users.flush();
         audit.write("USER_PASSWORD_CHANGED", "USER", user.getId(), java.util.Map.of(),
                 java.util.Map.of("passwordChanged", true), "Người dùng đổi mật khẩu");

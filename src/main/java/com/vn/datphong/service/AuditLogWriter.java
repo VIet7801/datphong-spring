@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.slf4j.MDC;
 
 @Service
 @RequiredArgsConstructor
@@ -40,7 +41,23 @@ public class AuditLogWriter {
     public void write(String action, String entityType, Long entityId,
                       Map<String, Object> beforeState, Map<String, Object> afterState,
                       String reason) {
-        save(action, entityType, entityId, beforeState, afterState, reason, UUID.randomUUID().toString());
+        save(action, entityType, entityId, beforeState, afterState, reason, requestId());
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void accountEvent(String action, User actor, String reason) {
+        persist(action, "USER", actor.getId(), Map.of(), Map.of(), reason,
+                requestId(), actor, ActorType.USER);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void systemAccountEvent(String action, User target, String reason) {
+        persist(action, "USER", target.getId(), Map.of(), Map.of("status", target.getStatus().name()),
+                reason, requestId(), null, ActorType.SYSTEM);
+    }
+
+    private String requestId() {
+        return MDC.get("traceId") == null ? UUID.randomUUID().toString() : MDC.get("traceId");
     }
 
     private void save(String action, String entityType, Long entityId,
@@ -66,10 +83,16 @@ public class AuditLogWriter {
                         )
                 );
 
+        persist(action, entityType, entityId, beforeState, afterState, reason, operationId, actor, ActorType.USER);
+    }
+
+    private void persist(String action, String entityType, Long entityId,
+                         Map<String, Object> beforeState, Map<String, Object> afterState,
+                         String reason, String operationId, User actor, ActorType actorType) {
         AuditLog log = AuditLog.builder()
                 .eventId(UUID.randomUUID())
                 .actor(actor)
-                .actorType(ActorType.USER)
+                .actorType(actorType)
                 .action(action)
                 .entityType(entityType)
                 .entityId(entityId)

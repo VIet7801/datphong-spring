@@ -130,7 +130,7 @@ try {
     Write-Host 'Đang kiểm tra và khởi tạo cấu trúc DB...'
     & $javaExecutable '-Dfile.encoding=UTF-8' -cp $JdbcJar 'scripts/java/SchemaTool.java' initialize
     if ($LASTEXITCODE -ne 0) { throw 'Khởi tạo thất bại. Xem thông báo phía trên để xử lý nguyên nhân.' }
-    Write-Host 'Hoàn tất. Có thể chạy ứng dụng với ddl-auto: validate.'
+    Write-Host 'Baseline ready. Run cap-nhat-schema.cmd and cap-nhat-rbac.cmd before starting the application.'
 } catch {
     Write-Host ("Lỗi: " + $_.Exception.Message) -ForegroundColor Red
     exit 1

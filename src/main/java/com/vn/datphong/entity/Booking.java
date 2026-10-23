@@ -30,11 +30,11 @@ public class Booking extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "booking_code", nullable = false, unique = true, length = 20)
+    @Column(name = "booking_code", nullable = false, unique = true)
     private String bookingCode;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "customer_id", nullable = false)
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -53,13 +53,13 @@ public class Booking extends BaseEntity {
     @JoinColumn(name = "room_unit_id")
     private RoomUnit roomUnit;
 
-    @Column(name = "checkin_date", nullable = false)
+    @Column(name = "check_in", nullable = false)
     private LocalDate checkinDate;
 
-    @Column(name = "checkout_date", nullable = false)
+    @Column(name = "check_out", nullable = false)
     private LocalDate checkoutDate;
 
-    @Column(name = "guests_count", nullable = false)
+    @Column(name = "guest_count", nullable = false)
     @Builder.Default
     private Integer guestsCount = 1;
 
@@ -74,7 +74,7 @@ public class Booking extends BaseEntity {
     @Column(name = "expires_at")
     private LocalDateTime expiresAt;
 
-    @Column(name = "total_price", nullable = false, precision = 12, scale = 2)
+    @Column(name = "total_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalPrice;
 
     @Column(nullable = false, length = 5)
@@ -109,8 +109,25 @@ public class Booking extends BaseEntity {
     @Column(name = "price_version")
     private Long priceVersion;
 
-    @Column(name = "cancellation_policy_snapshot", columnDefinition = "TEXT")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "cancellation_policy_snapshot", nullable = false, columnDefinition = "jsonb")
     private String cancellationPolicySnapshot;
+
+    @Column(name = "property_timezone_snapshot", nullable = false)
+    private String propertyTimezoneSnapshot;
+
+    @Column(name = "checkin_local_snapshot", nullable = false)
+    private LocalTime checkinLocalSnapshot;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source_channel", nullable = false)
+    @Builder.Default
+    private BookingSourceChannel sourceChannel = BookingSourceChannel.UNKNOWN;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "guest_segment_snapshot", nullable = false)
+    @Builder.Default
+    private GuestSegment guestSegmentSnapshot = GuestSegment.UNKNOWN;
 
     @Column(name = "special_request", length = 500)
     private String specialRequest;
@@ -129,7 +146,7 @@ public class Booking extends BaseEntity {
     @JoinColumn(name = "cancelled_by")
     private User cancelledBy;
 
-    @Column(name = "cancellation_reason", length = 500)
+    @Column(name = "cancel_reason", columnDefinition = "TEXT")
     private String cancellationReason;
 
     @Column(name = "cancellation_fee", precision = 12, scale = 2)
@@ -146,4 +163,10 @@ public class Booking extends BaseEntity {
 
     @Version
     private Long version;
+
+    @PrePersist
+    private void snapshotPropertySettings() {
+        if (propertyTimezoneSnapshot == null) propertyTimezoneSnapshot = property.getTimezone();
+        if (checkinLocalSnapshot == null) checkinLocalSnapshot = property.getCheckInFrom();
+    }
 }

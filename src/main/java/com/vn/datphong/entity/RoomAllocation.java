@@ -6,6 +6,10 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.*;
 import java.util.*;
+import com.vn.datphong.persistence.StayRange;
+import com.vn.datphong.persistence.StayRangeType;
+import org.hibernate.annotations.Formula;
+import org.hibernate.annotations.Type;
 
 @Getter
 @Setter
@@ -30,11 +34,23 @@ public class RoomAllocation extends BaseEntity {
     @JoinColumn(name = "booking_id", nullable = false, unique = true)
     private Booking booking;
 
-    @Column(name = "checkin_date", nullable = false)
+    @Type(StayRangeType.class)
+    @Column(name = "stay", nullable = false, columnDefinition = "daterange")
+    private StayRange stay;
+
+    @Formula("lower(stay)")
     private LocalDate checkinDate;
 
-    @Column(name = "checkout_date", nullable = false)
+    @Formula("upper(stay)")
     private LocalDate checkoutDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private AllocationStatus status = AllocationStatus.HELD;
+
+    @Version
+    private Long version;
 
     @Column(name = "hold_expires_at")
     private LocalDateTime holdExpiresAt;
@@ -44,5 +60,12 @@ public class RoomAllocation extends BaseEntity {
 
     @Column(name = "release_reason", length = 40)
     private String releaseReason;
+
+    @PrePersist
+    @PreUpdate
+    private void updateStay() {
+        if (checkinDate != null && checkoutDate != null) stay = new StayRange(checkinDate, checkoutDate);
+        if (stay == null) throw new IllegalArgumentException("Cần khoảng ngày giữ phòng hợp lệ");
+    }
 }
 

@@ -3,6 +3,7 @@ package com.vn.datphong.entity;
 import com.vn.datphong.enums.PaymentMethodType;
 import com.vn.datphong.enums.PaymentProvider;
 import com.vn.datphong.enums.PaymentStatusType;
+import com.vn.datphong.persistence.PaymentMethodConverter;
 
 import java.time.*;
 import java.util.*;
@@ -19,10 +20,7 @@ import java.time.Instant;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "payments", uniqueConstraints = {
-    @UniqueConstraint(name = "uq_payment_0", columnNames = {"provider", "merchant_id", "idempotency_key"}),
-    @UniqueConstraint(name = "uq_payment_1", columnNames = {"provider", "merchant_id", "provider_reference"})
-})
+@Table(name = "payments")
 public class Payment extends BaseEntity {
 
     @Id
@@ -35,7 +33,7 @@ public class Payment extends BaseEntity {
     @JoinColumn(name = "booking_id", nullable = false)
     private Booking booking;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = PaymentMethodConverter.class)
     @Column(nullable = false, length = 30)
     @Builder.Default
     private PaymentMethodType method = PaymentMethodType.FAKE_BANK;
@@ -61,6 +59,24 @@ public class Payment extends BaseEntity {
     @Column(name = "refunded_amount", nullable = false, precision = 12, scale = 2)
     @Builder.Default
     private BigDecimal refundedAmount = BigDecimal.ZERO;
+
+    @Column(name = "captured_amount", nullable = false, precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal capturedAmount = BigDecimal.ZERO;
+
+    @Column(name = "is_open", nullable = false)
+    @Builder.Default
+    private Boolean open = true;
+
+    @Column(name = "merchant_id", nullable = false)
+    @Builder.Default
+    private String merchantId = "datphong";
+
+    @Column(name = "intent_expires_at", nullable = false)
+    private Instant intentExpiresAt;
+
+    @Column(name = "correlation_id", nullable = false)
+    private String correlationId;
 
     /** Số tài khoản Fake Bank dùng để trả (chỉ là mã giả lập, không phải thẻ/tài khoản thật). */
     @Column(name = "payer_account", length = 40)
@@ -95,4 +111,24 @@ public class Payment extends BaseEntity {
 
     @Version
     private Long version;
+
+    @PrePersist
+    private void initializeIntent() {
+        if (correlationId == null) {
+            correlationId = org.slf4j.MDC.get("traceId");
+            if (correlationId == null) correlationId = UUID.randomUUID().toString();
+        }
+        if (intentExpiresAt == null) {
+            intentExpiresAt = booking.getExpiresAt() == null ? Instant.now().plusSeconds(900)
+                    : booking.getExpiresAt().atZone(ZoneId.systemDefault()).toInstant();
+        }
+        updateOpenState();
+    }
+
+    @PreUpdate
+    private void updateOpenState() {
+        open = status == PaymentStatusType.PENDING || status == PaymentStatusType.INITIATED
+                || status == PaymentStatusType.PROCESSING || status == PaymentStatusType.TIMED_OUT
+                || status == PaymentStatusType.UNKNOWN || status == PaymentStatusType.RECONCILING;
+    }
 }

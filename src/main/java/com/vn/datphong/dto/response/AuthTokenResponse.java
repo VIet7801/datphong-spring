@@ -1,39 +1,9 @@
 package com.vn.datphong.dto.response;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 import java.util.Set;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class AuthTokenResponse {
-
-    private String accessToken;
-    private String refreshToken;
-
-    @Builder.Default
-    private String tokenType = "Bearer";
-
-    private long expiresIn;
-
-    private UserSummary user;
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class UserSummary {
-        private Long id;
-        private String fullName;
-        private String username;
-        private Set<String> roles;
-        /** Cho frontend biet tai khoan da bat 2FA roi chua (de hien o chot nhap ma 2FA khi login). */
-        @Builder.Default
-        private Boolean twoFactorEnabled = false;
-    }
+public record AuthTokenResponse(String accessToken, String refreshToken, String tokenType,
+                                long expiresIn, long refreshExpiresIn, UserSummary user) {
+    public record UserSummary(Long id, String fullName, String username,
+                              Set<String> roles, Set<String> permissions) { }
 }

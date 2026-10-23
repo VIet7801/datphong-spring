@@ -1,22 +1,24 @@
 package com.vn.datphong.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
+import com.vn.datphong.util.EmailAddress;
+import jakarta.validation.constraints.*;
+import lombok.*;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-
-@AllArgsConstructor
 @Getter
 @Setter
-@NoArgsConstructor
-@Builder
-public class LoginRequest {
-    @NotBlank(message = "Username không được để trống")
+public class LoginRequest extends StrictRequest {
+    @Email @Size(max = 150)
+    private String email;
+    // Alias cho client cũ; API mới dùng email. Chỉ nhận một trong hai.
+    @Size(max = 50)
     private String username;
-
-    @NotBlank(message = "Password không được để trống")
+    @NotBlank @Size(max = 512)
     private String password;
+
+    public void setEmail(String email) { this.email = EmailAddress.normalize(email); }
+
+    @AssertTrue(message = "Gửi email hoặc username, không gửi cả hai")
+    public boolean isIdentifierValid() {
+        return (email != null && !email.isBlank()) != (username != null && !username.isBlank());
+    }
 }

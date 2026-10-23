@@ -30,7 +30,7 @@ public class PaymentResponse {
     private String failureCode;
     private String failureMessage;
     private LocalDateTime paidAt;
-    private LocalDateTime createdAt;
+    private Instant createdAt;
     private java.math.BigDecimal refundedAmount;
     private LocalDateTime capturedAt;
     //url để fe redirect sang vnpay/momo

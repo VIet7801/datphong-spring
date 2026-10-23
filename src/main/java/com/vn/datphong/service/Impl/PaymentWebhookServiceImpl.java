@@ -4,7 +4,7 @@ import com.vn.datphong.dto.request.FakeBankWebhookRequest;
 import com.vn.datphong.exception.DomainException;
 import com.vn.datphong.service.PaymentWebhookService;
 import com.vn.datphong.util.PaymentWebhookTx;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
@@ -19,7 +19,8 @@ public class PaymentWebhookServiceImpl implements PaymentWebhookService {
     private final Clock clock;
     private final String secret;
 
-    public PaymentWebhookServiceImpl(PaymentWebhookTx tx, Clock clock, @Value("${app.fakebank.webhook-secret}") String secret) {
+    public PaymentWebhookServiceImpl(PaymentWebhookTx tx, Clock clock,
+                                     @Qualifier("fakeBankWebhookSecret") String secret) {
         this.tx = tx;
         this.clock = clock;
         this.secret = secret;

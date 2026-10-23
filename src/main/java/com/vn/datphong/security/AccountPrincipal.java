@@ -12,7 +12,8 @@ public class AccountPrincipal extends org.springframework.security.core.userdeta
 
     public AccountPrincipal(User user, Collection<? extends GrantedAuthority> authorities) {
         super(user.getUsername(), user.getPassword(),
-                Boolean.TRUE.equals(user.getActive()) && user.getStatus() == UserStatus.ACTIVE,
+                Boolean.TRUE.equals(user.getActive()) && user.getStatus() == UserStatus.ACTIVE
+                        && user.getEmailVerifiedAt() != null,
                 true, true, user.getStatus() != UserStatus.LOCKED, authorities);
         this.userId = user.getId();
         this.tokenVersion = user.getTokenVersion() == null ? 0L : user.getTokenVersion();

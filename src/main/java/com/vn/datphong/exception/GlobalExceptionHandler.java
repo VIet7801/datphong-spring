@@ -19,6 +19,8 @@ import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
@@ -80,9 +82,14 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Kiểu nội dung không được hỗ trợ", "UNSUPPORTED_MEDIA_TYPE", null);
     }
 
-    @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<ApiResponse<?>> handleNoResource(NoResourceFoundException ex) {
+    @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
+    public ResponseEntity<ApiResponse<?>> handleNoResource(Exception ex) {
         return build(HttpStatus.NOT_FOUND, "Không tìm thấy tài nguyên", "RESOURCE_NOT_FOUND", null);
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ApiResponse<?>> handleMethodValidation(HandlerMethodValidationException ex) {
+        return build(HttpStatus.valueOf(ex.getStatusCode().value()), "Dữ liệu không hợp lệ", "VALIDATION_ERROR", null);
     }
 
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
@@ -99,7 +106,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<?>> handleIntegrity(DataIntegrityViolationException ex) {
-        log.warn("Vi phạm ràng buộc dữ liệu: {}", ex.getMostSpecificCause().getMessage());
+        // PostgreSQL có thể kèm cả bản ghi lỗi (hash mật khẩu/token) trong message.
+        log.warn("Vi phạm ràng buộc dữ liệu ({})", ex.getClass().getSimpleName());
         return build(HttpStatus.CONFLICT, "Dữ liệu xung đột với trạng thái hiện tại", "CONFLICT", null);
     }
 
@@ -127,7 +135,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<?>> handleBusinessException(BusinessException ex) {
         HttpStatus status = HttpStatus.resolve(ex.getStatus());
-        return build(status == null ? HttpStatus.BAD_REQUEST : status, ex.getMessage(), "BUSINESS_ERROR", ex.getMessage());
+        return build(status == null ? HttpStatus.BAD_REQUEST : status, ex.getMessage(), ex.getCode(), null);
     }
 
     @ExceptionHandler(Exception.class)

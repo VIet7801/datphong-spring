@@ -28,7 +28,8 @@ public class RbacCatalogTool {
                     try (Statement statement = db.createStatement()) {
                         statement.execute("SET LOCAL lock_timeout = '5s'");
                         statement.execute("SET LOCAL statement_timeout = '30s'");
-                        for (String migration : List.of("V003__user_rbac_catalog.sql", "V004__support_audit_read.sql")) {
+                        for (String migration : List.of("V003__user_rbac_catalog.sql", "V004__support_audit_read.sql",
+                                "V005__account_authentication.sql")) {
                             statement.execute(Files.readString(Path.of("scripts/sql", migration)));
                         }
                     }
@@ -49,8 +50,22 @@ public class RbacCatalogTool {
                 System.out.println("MISSING_REQUIRED " + missing);
                 System.out.println("SUPPORT_PERMISSIONS " + supportPermissions);
                 System.out.println("SUPPORT_MISSING_REQUIRED " + supportMissing);
+                boolean verificationReady;
+                try (Statement statement = db.createStatement(); ResultSet result = statement.executeQuery("""
+                        SELECT EXISTS(SELECT 1 FROM email_templates t JOIN email_template_versions v
+                          ON v.template_id=t.id AND v.version_no=t.active_version
+                          WHERE t.template_code='EMAIL_VERIFICATION' AND t.locale='vi-VN'
+                            AND t.status='ACTIVE' AND v.published_at IS NOT NULL)
+                        """)) {
+                    result.next();
+                    verificationReady = result.getBoolean(1);
+                }
+                System.out.println("VERIFICATION_TEMPLATE_READY " + verificationReady);
                 if (!command.equals("inspect") && (!missing.isEmpty() || !supportMissing.isEmpty())) {
                     throw new IllegalStateException("ROLE_ADMIN/ROLE_SUPPORT còn thiếu permission bắt buộc");
+                }
+                if (!command.equals("inspect") && !verificationReady) {
+                    throw new IllegalStateException("Thiếu mẫu email xác minh; chạy cap-nhat-rbac.cmd");
                 }
                 if (command.equals("apply")) {
                     db.commit();

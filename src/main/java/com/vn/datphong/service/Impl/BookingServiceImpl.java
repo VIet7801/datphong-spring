@@ -13,11 +13,11 @@ import com.vn.datphong.enums.BookingStatusType;
 import com.vn.datphong.enums.OutboxStatus;
 import com.vn.datphong.enums.PaymentStatusType;
 import com.vn.datphong.enums.PropertyStatus;
-import com.vn.datphong.enums.RefundStatusType;
 import com.vn.datphong.exception.DomainException;
 import com.vn.datphong.mapper.BookingMapper;
 import com.vn.datphong.repository.*;
 import com.vn.datphong.service.BookingService;
+import com.vn.datphong.service.RefundService;
 import com.vn.datphong.util.BookingStateMachine;
 import com.vn.datphong.util.CancellationPolicySnapshot;
 import com.vn.datphong.util.Hashing;
@@ -76,7 +76,7 @@ public class BookingServiceImpl implements BookingService {
     private final RoomRateRepository roomRateRepository;
     private final CancellationPolicyRuleRepository ruleRepository;
     private final PaymentRepository paymentRepository;
-    private final RefundRequestRepository refundRepository;
+    private final RefundService refundService;
     private final OutboxEventRepository outboxRepository;
     private final UserRepository userRepository;
     private final Clock clock;
@@ -90,7 +90,7 @@ public class BookingServiceImpl implements BookingService {
                               BookingStatusHistoryRepository historyRepository, RoomAllocationRepository allocationRepository,
                               IdempotencyRecordRepository idempotencyRepository, RoomRepository roomRepository,
                               RoomRateRepository roomRateRepository, CancellationPolicyRuleRepository ruleRepository,
-                              PaymentRepository paymentRepository, RefundRequestRepository refundRepository,
+                              PaymentRepository paymentRepository, RefundService refundService,
                               OutboxEventRepository outboxRepository, UserRepository userRepository, Clock clock,
                               PlatformTransactionManager txManager,
                               @Value("${app.booking.hold-minutes:15}") int holdMinutes,
@@ -105,7 +105,7 @@ public class BookingServiceImpl implements BookingService {
         this.roomRateRepository = roomRateRepository;
         this.ruleRepository = ruleRepository;
         this.paymentRepository = paymentRepository;
-        this.refundRepository = refundRepository;
+        this.refundService = refundService;
         this.outboxRepository = outboxRepository;
         this.userRepository = userRepository;
         this.clock = clock;
@@ -362,7 +362,8 @@ public class BookingServiceImpl implements BookingService {
         releaseAllocation(bookingId, "CANCELLED");
         if (result.refundAmount().signum() > 0 && !paid.isEmpty()) {
             transition(b, BookingStatusType.REFUND_PENDING, source, actor, reason);
-            requestRefund(b, paid.get(0), result.refundAmount(), "CANCELLATION", reason, "refund:cancel:" + bookingId);
+            refundService.request(b, paid.get(0), result.refundAmount(), RefundService.KIND_CANCELLATION,
+                    reason, "refund:cancel:" + bookingId);
         } else {
             transition(b, BookingStatusType.CANCELLED, source, actor, reason);
         }
@@ -463,6 +464,7 @@ public class BookingServiceImpl implements BookingService {
         allocationRepository.findByBookingId(bookingId).ifPresent(a -> {
             if (a.getReleasedAt() == null) {
                 a.setReleasedAt(LocalDateTime.now(clock));
+                a.setStatus(com.vn.datphong.enums.AllocationStatus.RELEASED);
                 a.setReleaseReason(reason);
                 a.setHoldExpiresAt(null);
             }
@@ -471,7 +473,10 @@ public class BookingServiceImpl implements BookingService {
 
     /** Xác nhận thanh toán: allocation trở thành vĩnh viễn (không còn hạn giữ). */
     private void pinAllocation(Long bookingId) {
-        allocationRepository.findByBookingId(bookingId).ifPresent(a -> a.setHoldExpiresAt(null));
+        allocationRepository.findByBookingId(bookingId).ifPresent(a -> {
+            a.setHoldExpiresAt(null);
+            a.setStatus(com.vn.datphong.enums.AllocationStatus.CONFIRMED);
+        });
     }
 
     // ---------------------------------------------------------------- helper nội bộ: outbox
@@ -485,26 +490,6 @@ public class BookingServiceImpl implements BookingService {
                 .status(OutboxStatus.PENDING)
                 .availableAt(LocalDateTime.now(clock))
                 .build());
-    }
-
-    // ---------------------------------------------------------------- helper nội bộ: yêu cầu hoàn tiền
-    /** Tạo yêu cầu hoàn tiền trong transaction của luồng gọi (đã khóa booking). Idempotent theo key. */
-    private void requestRefund(Booking booking, Payment payment, BigDecimal amount, String kind, String reason, String key) {
-        if (refundRepository.findByIdempotencyKey(key).isPresent()) {
-            return;
-        }
-        if (amount.signum() <= 0) {
-            throw DomainException.badRequest("VALIDATION_ERROR", "Số tiền hoàn phải dương");
-        }
-        BigDecimal committed = refundRepository.sumCommitted(payment.getId());
-        if (committed.add(amount).compareTo(payment.getAmount()) > 0) {
-            throw DomainException.conflict("REFUND_EXCEEDS_CAPTURE", "Tổng tiền hoàn vượt số tiền đã thu");
-        }
-        RefundRequest r = refundRepository.saveAndFlush(RefundRequest.builder().booking(booking).payment(payment)
-                .amount(amount).currency(payment.getCurrency()).reason(reason).kind(kind)
-                .status(RefundStatusType.REQUESTED).idempotencyKey(key).build());
-        publish("REFUND_REQUESTED", "REFUND", r.getId(), Json.obj("refundId", r.getId(),
-                "bookingId", booking.getId(), "userId", booking.getUser().getId(), "amount", amount, "kind", kind));
     }
 
     // ---------------------------------------------------------------- helper nội bộ: người gọi

@@ -38,7 +38,7 @@ public class RbacPolicy {
 
     public void preserveLastAdmin(User target, boolean remainsActiveAdmin) {
         boolean currentlyActiveAdmin = Boolean.TRUE.equals(target.getActive())
-                && target.getStatus() == UserStatus.ACTIVE && hasAdminRole(target);
+                && target.getStatus() == UserStatus.ACTIVE && target.getEmailVerifiedAt() != null && hasAdminRole(target);
         if (currentlyActiveAdmin && !remainsActiveAdmin
                 && users.countActiveAdmins(UserStatus.ACTIVE) <= 1) {
             throw new BusinessException(409, "Không thể vô hiệu hóa ADMIN hoạt động cuối cùng");
@@ -47,6 +47,14 @@ public class RbacPolicy {
 
     public static boolean hasAdminRole(User user) {
         return user.getRoles().stream().anyMatch(r -> "ROLE_ADMIN".equals(r.getCode()));
+    }
+
+    /** USER_MANAGE không cho can thiệp admin khác có quyền rộng hơn người gọi. */
+    public void requireManageableUser(User target) {
+        User actor = currentUser.require();
+        if (hasAdminRole(target) && !Objects.equals(actor.getId(), target.getId())) {
+            requireDelegableRoles(target.getRoles());
+        }
     }
 
     public void requireNotOwnRole(Role role) {

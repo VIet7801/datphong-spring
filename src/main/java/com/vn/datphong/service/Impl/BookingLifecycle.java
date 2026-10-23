@@ -6,6 +6,7 @@ import com.vn.datphong.entity.RoomAllocation;
 import com.vn.datphong.entity.User;
 import com.vn.datphong.enums.BookingStatusChangeSource;
 import com.vn.datphong.enums.BookingStatusType;
+import com.vn.datphong.enums.AllocationStatus;
 import com.vn.datphong.exception.DomainException;
 import com.vn.datphong.repository.BookingStatusHistoryRepository;
 import com.vn.datphong.repository.RoomAllocationRepository;
@@ -57,6 +58,7 @@ public class BookingLifecycle {
     private void release(RoomAllocation a, String reason) {
         if (a.getReleasedAt() == null) {
             a.setReleasedAt(LocalDateTime.now(clock));
+            a.setStatus(AllocationStatus.RELEASED);
             a.setReleaseReason(reason);
             a.setHoldExpiresAt(null);
         }
@@ -65,6 +67,9 @@ public class BookingLifecycle {
     /** Xác nhận thanh toán: allocation trở thành vĩnh viễn (không còn hạn giữ). */
     @Transactional(propagation = Propagation.MANDATORY)
     public void pinAllocation(Long bookingId) {
-        allocationRepository.findByBookingId(bookingId).ifPresent(a -> a.setHoldExpiresAt(null));
+        allocationRepository.findByBookingId(bookingId).ifPresent(a -> {
+            a.setHoldExpiresAt(null);
+            a.setStatus(AllocationStatus.CONFIRMED);
+        });
     }
 }

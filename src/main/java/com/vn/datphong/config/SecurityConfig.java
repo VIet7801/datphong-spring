@@ -1,136 +1,87 @@
 package com.vn.datphong.config;
 
-import com.vn.datphong.security.JwtAuthenticationFilter;
-
-import com.vn.datphong.security.JwtTokenProvider;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import com.vn.datphong.security.*;
+import com.vn.datphong.service.Impl.CustomUserDetailsService;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.context.annotation.*;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.AuthenticationEntryPoint;
-import org.springframework.security.web.access.AccessDeniedHandler;
 
-/**
- * Cấu hình bảo mật được tạo khi khởi động, không phải điểm xử lý từng request.
- * Luồng runtime: JWT filter -> kiểm tra URL -> controller -> proxy kiểm tra quyền service.
- * Xem docs/REQUEST_FLOW.md để theo dõi đầy đủ request/response.
- */
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
-
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // Provider dùng UserDetailsService để tải user và PasswordEncoder để đối chiếu mật khẩu lúc login.
     @Bean
-    public DaoAuthenticationProvider daoAuthenticationProvider(
-            UserDetailsService userDetailsService,
-            PasswordEncoder passwordEncoder
-    ) {
-        DaoAuthenticationProvider provider =
-                new DaoAuthenticationProvider(userDetailsService);
-
-        provider.setPasswordEncoder(passwordEncoder);
-
+    public DaoAuthenticationProvider daoAuthenticationProvider(CustomUserDetailsService details, PasswordEncoder encoder) {
+        var provider = new DaoAuthenticationProvider(details);
+        provider.setPasswordEncoder(encoder);
         return provider;
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(
-            AuthenticationConfiguration configuration
-    ) throws Exception {
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
         return configuration.getAuthenticationManager();
     }
 
-    // Tạo filter thành Bean, không gắn @Component trên class filter.
     @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter(
-            JwtTokenProvider jwtProvider,
-            UserDetailsService userDetailsService
-    ) {
-        return new JwtAuthenticationFilter(
-                jwtProvider,
-                userDetailsService
-        );
+    public JwtAuthenticationFilter jwtAuthenticationFilter(JwtTokenProvider jwt, CustomUserDetailsService details) {
+        return new JwtAuthenticationFilter(jwt, details);
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(
-            HttpSecurity http,
-            DaoAuthenticationProvider provider,
-            JwtAuthenticationFilter jwtFilter
-    )  {
+    public RequestIdFilter requestIdFilter() {
+        return new RequestIdFilter();
+    }
 
-        // Chưa đăng nhập hoặc JWT không hợp lệ: trả HTTP 401.
-        AuthenticationEntryPoint authenticationEntryPoint =
-                (request, response, exception) ->
-                        response.sendError(401, "Unauthorized");
+    // Các filter chỉ chạy trong security chain, không đăng ký lần hai ở servlet container.
+    @Bean
+    public FilterRegistrationBean<JwtAuthenticationFilter> jwtRegistration(JwtAuthenticationFilter filter) {
+        var registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
 
-        // Đã đăng nhập nhưng không đủ quyền: trả HTTP 403.
-        AccessDeniedHandler accessDeniedHandler =
-                (request, response, exception) ->
-                        response.sendError(403, "Forbidden");
+    @Bean
+    public FilterRegistrationBean<RequestIdFilter> requestIdRegistration(RequestIdFilter filter) {
+        var registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
 
-        http.csrf(csrf -> csrf.disable())
-
-                .formLogin(form -> form.disable())
-                .httpBasic(basic -> basic.disable())
-
-                // Mỗi request cần tự gửi JWT; không duy trì đăng nhập bằng HTTP session.
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(
-                                SessionCreationPolicy.STATELESS
-                        )
-                )
-
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, DaoAuthenticationProvider provider,
+            JwtAuthenticationFilter jwt, RequestIdFilter requestIds) {
+        return http.csrf(csrf -> csrf.disable())
+                .formLogin(form -> form.disable()).httpBasic(basic -> basic.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(provider)
-
-                .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint(
-                                authenticationEntryPoint
-                        )
-                        .accessDeniedHandler(accessDeniedHandler)
-                )
-
-                // UC-19: mở riêng GET Audit Log cho ADMIN/SUPPORT; service kiểm tra AUDIT_READ.
+                .exceptionHandling(errors -> errors
+                        .authenticationEntryPoint((req, res, ex) ->
+                                JsonErrorWriter.write(res, 401, "UNAUTHORIZED", "Chưa xác thực"))
+                        .accessDeniedHandler((req, res, ex) ->
+                                JsonErrorWriter.write(res, 403, "FORBIDDEN", "Không đủ quyền truy cập")))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/api/auth/login",
-                                "/auth/login",
-                                "/swagger-ui.html",
-                                "/swagger-ui/**",
-                                "/v3/api-docs",
-                                "/v3/api-docs/**"
-                        ).permitAll()
-                        .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/v1/admin/audit-logs",
-                                "/api/admin/audit-logs"
-                        ).hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPPORT")
-                        .requestMatchers("/api/v1/admin/**", "/api/admin/**")
-                        .hasAuthority("ROLE_ADMIN")
-                        .anyRequest().authenticated()
-                )
-
-                // Xác thực JWT trước khi chuỗi filter quyết định request có được đi tiếp không.
-                .addFilterBefore(
-                        jwtFilter,
-                        UsernamePasswordAuthenticationFilter.class
-                );
-
-        return http.build();
+                        .requestMatchers(HttpMethod.POST, AuthEndpoints.PUBLIC_POSTS.toArray(String[]::new)).permitAll()
+                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs", "/v3/api-docs/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/admin/audit-logs", "/api/admin/audit-logs")
+                            .hasAnyAuthority("ROLE_ADMIN", "ROLE_SUPPORT")
+                        .requestMatchers("/api/v1/admin/**", "/api/admin/**").hasAuthority("ROLE_ADMIN")
+                        .anyRequest().authenticated())
+                .addFilterBefore(jwt, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(requestIds, JwtAuthenticationFilter.class)
+                .build();
     }
 }

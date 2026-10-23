@@ -27,6 +27,19 @@ public class BookingStatusHistory {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "event_id", nullable = false, unique = true)
+    @Builder.Default
+    private UUID eventId = UUID.randomUUID();
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "actor_type", nullable = false)
+    @Builder.Default
+    private ActorType actorType = ActorType.SYSTEM;
+
+    @Column(name = "occurred_at", nullable = false)
+    @Builder.Default
+    private Instant occurredAt = Instant.now();
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "booking_id", nullable = false)
     private Booking booking;
@@ -56,4 +69,10 @@ public class BookingStatusHistory {
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    @PrePersist
+    private void identifyEvent() {
+        if (actor != null) actorType = ActorType.USER;
+        if (correlationId == null) correlationId = UUID.randomUUID().toString();
+    }
 }

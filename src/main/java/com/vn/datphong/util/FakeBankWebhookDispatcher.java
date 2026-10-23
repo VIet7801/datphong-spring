@@ -6,7 +6,7 @@ import com.vn.datphong.repository.FakeBankWebhookEventRepository;
 import com.vn.datphong.service.PaymentWebhookService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -29,7 +29,7 @@ public class FakeBankWebhookDispatcher {
     private final TransactionTemplate tx;
 
     public FakeBankWebhookDispatcher(FakeBankWebhookEventRepository repository, PaymentWebhookService receiver, Clock clock,
-                                     @Value("${app.fakebank.webhook-secret}") String secret,
+                                     @Qualifier("fakeBankWebhookSecret") String secret,
                                      PlatformTransactionManager txManager) {
         this.repository = repository;
         this.receiver = receiver;

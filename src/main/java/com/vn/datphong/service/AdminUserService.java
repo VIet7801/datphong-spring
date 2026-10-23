@@ -8,14 +8,14 @@ import com.vn.datphong.exception.*;
 import com.vn.datphong.mapper.UserViewMapper;
 import com.vn.datphong.repository.*;
 import com.vn.datphong.service.support.*;
+import com.vn.datphong.service.identity.AccountRegistrationService;
+import com.vn.datphong.service.identity.AccountSessionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -25,9 +25,11 @@ import java.util.stream.Collectors;
 public class AdminUserService {
     private final UserRepository users;
     private final RoleRepository roles;
-    private final PasswordEncoder passwordEncoder;
     private final AuditLogWriter audit;
     private final RbacPolicy policy;
+    private final AccountRegistrationService registration;
+    private final AccountSessionService sessions;
+    private final AdminAccountImpact impact;
 
     @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('ROLE_ADMIN') and hasAuthority('USER_READ')")
@@ -40,28 +42,16 @@ public class AdminUserService {
     @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('ROLE_ADMIN') and hasAuthority('USER_READ')")
     public AdminUserResponse get(Long id) {
-        return UserViewMapper.admin(requireUser(id));
+        return UserViewMapper.admin(requireUser(id)).withWarnings(impact.warnings(id));
     }
 
     @Transactional
     @PreAuthorize("hasAuthority('ROLE_ADMIN') and hasAuthority('USER_MANAGE')")
     public AdminUserResponse create(AdminUserCreateRequest request) {
-        if (request.getPassword().getBytes(StandardCharsets.UTF_8).length > 72) {
-            throw new BadRequestExcept("Mật khẩu vượt giới hạn 72 byte của BCrypt");
-        }
-        if (users.existsByUsername(request.getUsername()) || users.existsByEmailIgnoreCase(request.getEmail())) {
-            throw new BusinessException(409, "Username hoặc email đã tồn tại");
-        }
-        Role customer = roles.findByCode("ROLE_CUSTOMER")
-                .orElseThrow(() -> new BusinessException(503, "Chưa khởi tạo ROLE_CUSTOMER"));
-        User user = User.builder().username(request.getUsername()).email(request.getEmail())
-                .fullName(request.getFullName()).phone(request.getPhone()).gender(request.getGender())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .active(false).status(UserStatus.IN_ACTIVE).roles(new HashSet<>(Set.of(customer))).build();
-        users.saveAndFlush(user);
+        User user = registration.createByAdmin(request);
         // Không ghi mật khẩu/hash, email hay phone vào event.
         audit.write("USER_CREATED", "USER", user.getId(), Map.of(),
-                Map.of("status", user.getStatus().name(), "roles", Set.of(customer.getCode())), request.getReason());
+                Map.of("status", user.getStatus().name(), "roles", roleCodes(user)), request.getReason());
         return UserViewMapper.admin(user);
     }
 
@@ -69,6 +59,7 @@ public class AdminUserService {
     @PreAuthorize("hasAuthority('ROLE_ADMIN') and hasAuthority('USER_MANAGE')")
     public AdminUserResponse updateProfile(Long id, AdminProfileUpdateRequest request) {
         User user = requireUser(id);
+        policy.requireManageableUser(user);
         ChangeTracker.requireVersion(user.getVersion(), request.getVersion());
         ChangeTracker changes = UserProfileService.applyProfile(user, request);
         if (changes.hasChanges()) {
@@ -83,33 +74,38 @@ public class AdminUserService {
     @PreAuthorize("hasAuthority('ROLE_ADMIN') and hasAuthority('USER_MANAGE')")
     public AdminUserResponse changeStatus(Long id, UserStatusUpdateRequest request) {
         policy.lockAdministration();
-        User user = requireUser(id);
+        User user = requireUserForUpdate(id);
         ChangeTracker.requireVersion(user.getVersion(), request.getVersion());
         policy.requireNotSelf(user);
+        policy.requireManageableUser(user);
         // PENDING_VERIFICATION thuộc luồng đăng ký/xác minh, không phải thao tác khóa/mở khóa.
         if (request.getStatus() == UserStatus.PENDING_VERIFICATION) {
             throw new BadRequestExcept("Chỉ quản trị ACTIVE, IN_ACTIVE hoặc LOCKED");
         }
         boolean active = request.getStatus() == UserStatus.ACTIVE;
+        if (active && user.getEmailVerifiedAt() == null) {
+            throw new BusinessException(409, "EMAIL_NOT_VERIFIED", "Cần xác minh email trước khi kích hoạt");
+        }
         policy.preserveLastAdmin(user, active && RbacPolicy.hasAdminRole(user));
         if (user.getStatus() != request.getStatus() || !Objects.equals(user.getActive(), active)) {
             Map<String, Object> before = statusSnapshot(user);
             user.setStatus(request.getStatus());
             user.setActive(active);
-            user.setTokenVersion(user.getTokenVersion() + 1);
+            sessions.revokeAll(user);
             users.flush();
             audit.write("USER_STATUS_CHANGED", "USER", id, before, statusSnapshot(user), request.getReason());
         }
-        return UserViewMapper.admin(user);
+        return UserViewMapper.admin(user).withWarnings(impact.warnings(user.getId()));
     }
 
     @Transactional
     @PreAuthorize("hasAuthority('ROLE_ADMIN') and hasAuthority('USER_ROLE_MANAGE')")
     public AdminUserResponse replaceRoles(Long id, UserRolesUpdateRequest request) {
         policy.lockAdministration();
-        User user = requireUser(id);
+        User user = requireUserForUpdate(id);
         ChangeTracker.requireVersion(user.getVersion(), request.getVersion());
         policy.requireNotSelf(user);
+        policy.requireManageableUser(user);
         List<Role> selected = roles.findAllById(request.getRoleIds());
         if (selected.size() != request.getRoleIds().size()) {
             throw new BadRequestExcept("Có roleId không tồn tại");
@@ -125,11 +121,15 @@ public class AdminUserService {
         policy.preserveLastAdmin(user, remainsAdmin);
         Set<String> before = roleCodes(user);
         user.setRoles(new HashSet<>(selected));
-        user.setTokenVersion(user.getTokenVersion() + 1);
+        sessions.revokeAll(user);
         users.flush();
         audit.write("USER_ROLES_CHANGED", "USER", id,
                 Map.of("roles", before), Map.of("roles", roleCodes(user)), request.getReason());
-        return UserViewMapper.admin(user);
+        return UserViewMapper.admin(user).withWarnings(impact.warnings(user.getId()));
+    }
+
+    private User requireUserForUpdate(Long id) {
+        return users.findByIdForUpdate(id).orElseThrow(() -> new ResourceNotFoundExcept("User không tồn tại"));
     }
 
     private User requireUser(Long id) {

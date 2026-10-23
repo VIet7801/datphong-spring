@@ -3,24 +3,23 @@ package com.vn.datphong.service;
 import com.vn.datphong.entity.Booking;
 import com.vn.datphong.entity.Payment;
 import com.vn.datphong.entity.RefundRequest;
-import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-@Component
 public interface RefundService {
 
-    public static final String KIND_CANCELLATION = "CANCELLATION";
+    String KIND_CANCELLATION = "CANCELLATION";
 
-    public static final String KIND_LATE_PAYMENT = "LATE_PAYMENT";
+    String KIND_LATE_PAYMENT = "LATE_PAYMENT";
 
 
-    public record Claim(Long refundId, String idempotencyKey, String debitReference, BigDecimal amount) {
+    record Claim(Long refundId, String idempotencyKey, String debitReference, BigDecimal amount) {
     }
 
 
     RefundRequest request(Booking booking, Payment payment, BigDecimal amount, String kind, String reason, String key);
 
 
+    /** Trả null khi chưa đến lượt, đang được xử lý hoặc đã kết thúc. force không bỏ qua lease đang giữ. */
     Claim claim(Long refundId, boolean force);
 
 

@@ -9,6 +9,9 @@ import com.vn.datphong.exception.GlobalExceptionHandler;
 import com.vn.datphong.repository.UserRepository;
 import com.vn.datphong.repository.RolePermissionRepository;
 import com.vn.datphong.service.AuthenticationService;
+import com.vn.datphong.service.identity.AccountSessionService;
+import com.vn.datphong.service.identity.AccountRegistrationService;
+import com.vn.datphong.dto.response.AuthTokenResponse;
 import com.vn.datphong.service.Impl.CustomUserDetailsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +25,7 @@ import org.springframework.boot.test.context.TestComponent;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
@@ -60,6 +64,24 @@ class UserAccountStatusTest {
     @Import({SecurityConfig.class, CustomUserDetailsService.class, AuthenticationService.class,
             AuthenticationController.class, GlobalExceptionHandler.class, ProtectedEndpoint.class})
     static class TestConfig {
+        @Bean
+        AuthRateLimiter limiter() { return mock(AuthRateLimiter.class); }
+
+        @Bean
+        AccountRegistrationService registration() { return mock(AccountRegistrationService.class); }
+
+        @Bean
+        AccountSessionService sessions(JwtTokenProvider tokens) {
+            AccountSessionService service = mock(AccountSessionService.class);
+            when(service.open(any(AccountPrincipal.class))).thenAnswer(call -> {
+                AccountPrincipal principal = call.getArgument(0);
+                var auth = new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+                return new AuthTokenResponse(tokens.generateToken(auth), "test-refresh", "Bearer", 60, 600,
+                        new AuthTokenResponse.UserSummary(principal.getUserId(), "Alice", principal.getUsername(),
+                                Set.of("ROLE_USER"), Set.of()));
+            });
+            return service;
+        }
         @Bean
         UserRepository userRepository() {
             return mock(UserRepository.class);
@@ -100,10 +122,11 @@ class UserAccountStatusTest {
         reset(repository);
         currentUser.set(User.builder().id(1L).username("alice")
                 .password(encoder.encode("test-password"))
-                .active(true).status(UserStatus.ACTIVE)
+                .active(true).status(UserStatus.ACTIVE).emailVerifiedAt(java.time.Instant.now())
                 .roles(Set.of(Role.builder().code("ROLE_USER").build())).build());
         when(repository.findByUsername("alice"))
                 .thenAnswer(invocation -> Optional.ofNullable(currentUser.get()));
+        when(repository.findById(1L)).thenAnswer(invocation -> Optional.ofNullable(currentUser.get()));
         mvc = webAppContextSetup(context).apply(springSecurity()).build();
     }
 

@@ -19,14 +19,20 @@ import java.time.Instant;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "outbox_events", uniqueConstraints = {
-    @UniqueConstraint(name = "uq_outboxevent_0", columnNames = {"event_id"})
-})
+@Table(name = "outbox_events")
 public class OutboxEvent {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "event_id", nullable = false, unique = true)
+    @Builder.Default
+    private UUID eventId = UUID.randomUUID();
+
+    @Column(name = "payload_version", nullable = false)
+    @Builder.Default
+    private Integer payloadVersion = 1;
 
     @Column(name = "event_type", nullable = false, length = 100)
     private String eventType;
@@ -37,7 +43,8 @@ public class OutboxEvent {
     @Column(name = "aggregate_id", nullable = false)
     private Long aggregateId;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(nullable = false, columnDefinition = "jsonb")
     private String payload;
 
     @Enumerated(EnumType.STRING)

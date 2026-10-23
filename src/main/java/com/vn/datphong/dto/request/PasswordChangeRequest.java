@@ -12,6 +12,7 @@ public class PasswordChangeRequest extends StrictRequest {
     private Long version;
 
     @NotBlank
+    @Size(max = 512)
     private String currentPassword;
 
     @NotBlank

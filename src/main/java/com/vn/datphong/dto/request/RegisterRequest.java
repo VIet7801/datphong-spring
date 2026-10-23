@@ -1,52 +1,32 @@
 package com.vn.datphong.dto.request;
 
+import com.vn.datphong.util.EmailAddress;
 import jakarta.validation.constraints.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
-/**
- * Dùng cho POST /api/auth/register - khác với UsersResquest (Admin tạo/sửa user,
- * cho chọn role/status/active tuỳ ý). Người tự đăng ký KHÔNG được chọn role -
- * mặc định gán role "user" ở tầng Service.
- */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class RegisterRequest {
-
-    @NotBlank(message = "Họ và tên không được để trống")
-    @Size(max = 150, message = "Họ và tên không được quá 150 ký tự")
+@Getter
+@Setter
+public class RegisterRequest extends StrictRequest {
+    @NotBlank @Size(max = 150)
     private String fullName;
-
-    @NotBlank(message = "Email không được để trống")
-    @Email(message = "Email không đúng định dạng")
-    @Size(max = 150, message = "Email không được quá 150 ký tự")
+    @NotBlank @Email @Size(max = 150)
     private String email;
-
-    @NotBlank(message = "Số điện thoại không được để trống")
-    @Pattern(regexp = "^0[0-9]{9}$", message = "Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0")
+    @Pattern(regexp = "^0[0-9]{9}$")
     private String phone;
-
-    @NotBlank(message = "Username không được để trống")
-    @Size(min = 4, max = 50, message = "Username phải từ 4 đến 50 ký tự")
-    @Pattern(regexp = "^[a-zA-Z0-9._]+$", message = "Username chỉ được chứa chữ cái, số, dấu chấm và dấu gạch dưới")
+    @Size(min = 4, max = 50) @Pattern(regexp = "[a-zA-Z0-9._]+")
     private String username;
-
-    @NotBlank(message = "Mật khẩu không được để trống")
-    @Size(min = 6, max = 100, message = "Mật khẩu phải từ 6 đến 100 ký tự")
+    @NotBlank @Size(min = 12, max = 72)
     private String password;
-
-    @NotBlank(message = "Vui lòng nhập lại mật khẩu")
+    @NotBlank @Size(max = 72)
     private String confirmPassword;
-
+    @AssertTrue(message = "Cần đồng ý điều khoản sử dụng")
+    private boolean termsAccepted;
     private Boolean gender;
+
+    public void setEmail(String email) { this.email = EmailAddress.normalize(email); }
 
     @AssertTrue(message = "Mật khẩu nhập lại không khớp")
     public boolean isPasswordMatching() {
-        if (password == null || confirmPassword == null) return true;
-        return password.equals(confirmPassword);
+        return password == null || confirmPassword == null || password.equals(confirmPassword);
     }
 }

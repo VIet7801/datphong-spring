@@ -1,40 +1,60 @@
 package com.vn.datphong.controller;
 
-import com.vn.datphong.dto.request.LoginRequest;
-import com.vn.datphong.dto.response.ApiResponse;
-import com.vn.datphong.dto.response.LoginResponse;
+import com.vn.datphong.dto.request.*;
+import com.vn.datphong.dto.response.*;
 import com.vn.datphong.service.AuthenticationService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
-
+import jakarta.servlet.http.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-@RestController
-@RequestMapping("/api/auth")
-@RequiredArgsConstructor
-public class AuthenticationController {
+import java.util.Map;
 
-    private final AuthenticationService authenticationService;
+@RestController
+@RequestMapping({"/api/v1/auth", "/api/auth"})
+@RequiredArgsConstructor
+@SecurityRequirements
+public class AuthenticationController {
+    private final AuthenticationService service;
+
+    @ModelAttribute
+    public void noCache(HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        response.setHeader("Pragma", "no-cache");
+    }
+
+    @PostMapping("/register")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public ApiResponse<RegistrationResponse> register(@Valid @RequestBody RegisterRequest body, HttpServletRequest request) {
+        return ApiResponse.success(service.register(body, request.getRemoteAddr()));
+    }
+
+    @PostMapping("/verify")
+    public ApiResponse<RegistrationResponse> verify(@Valid @RequestBody VerifyEmailRequest body, HttpServletRequest request) {
+        return ApiResponse.success(service.verify(body, request.getRemoteAddr()));
+    }
+
+    @PostMapping("/resend-verification")
+    public ApiResponse<Map<String, String>> resend(@Valid @RequestBody ResendVerificationRequest body, HttpServletRequest request) {
+        service.resend(body.getEmail(), request.getRemoteAddr());
+        return ApiResponse.success(Map.of("message", "Nếu tài khoản cần xác minh, email sẽ được gửi"));
+    }
 
     @PostMapping("/login")
-    @SecurityRequirements
-    public ResponseEntity<ApiResponse<LoginResponse>> login(
-            @Valid @RequestBody LoginRequest request
-    ) {
-        // MVC đã chuyển JSON thành LoginRequest và validation trước khi vào thân hàm này.
-        // Service kiểm tra thông tin đăng nhập và chỉ tạo token khi xác thực thành công.
-        LoginResponse response =
-                authenticationService.login(request);
+    public ApiResponse<AuthTokenResponse> login(@Valid @RequestBody LoginRequest body, HttpServletRequest request) {
+        return ApiResponse.success(service.login(body, request.getRemoteAddr()));
+    }
 
-        // Trả đối tượng Java + HTTP 200; Spring serialize ApiResponse/LoginResponse thành JSON cho FE.
-        return ResponseEntity.ok(
-                ApiResponse.customsuccess(
-                        "Đăng nhập thành công",
-                        response
-                )
-        );
+    @PostMapping({"/refresh", "/refresh-token"})
+    public ApiResponse<AuthTokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest body, HttpServletRequest request) {
+        return ApiResponse.success(service.refresh(body.getRefreshToken(), request.getRemoteAddr()));
+    }
+
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout(@Valid @RequestBody RefreshTokenRequest body, HttpServletRequest request) {
+        service.logout(body.getRefreshToken(), request.getRemoteAddr());
     }
 }

@@ -12,6 +12,14 @@ import com.vn.datphong.repository.RoleRepository;
 import com.vn.datphong.repository.RolePermissionRepository;
 import com.vn.datphong.repository.PermissionRepository;
 import com.vn.datphong.repository.AuditLogRepository;
+import com.vn.datphong.repository.VerificationTokenRepository;
+import com.vn.datphong.repository.RefreshTokenRepository;
+import com.vn.datphong.repository.MailEventRepository;
+import com.vn.datphong.repository.EmailTemplateVersionRepository;
+import com.vn.datphong.config.AuthProperties;
+import com.vn.datphong.service.identity.*;
+import com.vn.datphong.service.support.AdminAccountImpact;
+import org.springframework.mail.javamail.JavaMailSender;
 import com.vn.datphong.service.*;
 import com.vn.datphong.service.Impl.*;
 import com.vn.datphong.service.support.RbacPolicy;
@@ -50,6 +58,7 @@ import java.nio.file.*;
 import java.security.SecureRandom;
 import java.sql.*;
 import java.time.OffsetDateTime;
+import java.time.*;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -59,6 +68,15 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 
 /**
  * PostgreSQL thật + JPA + transaction + JWT + MockMvc.
@@ -101,18 +119,24 @@ class UserRbacIntegrationTest {
     @TestConfiguration
     @EnableWebMvc
     @EnableWebSecurity
-    @EnableTransactionManagement
+    @EnableTransactionManagement(proxyTargetClass = true)
     @EnableJpaRepositories(basePackageClasses = UserRepository.class,
             includeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE,
                     classes = {UserRepository.class, RoleRepository.class, RolePermissionRepository.class,
-                            PermissionRepository.class, AuditLogRepository.class}))
+                            PermissionRepository.class, AuditLogRepository.class, VerificationTokenRepository.class,
+                            RefreshTokenRepository.class, MailEventRepository.class, EmailTemplateVersionRepository.class}))
     @Import({SecurityConfig.class, CustomUserDetailsService.class, AuthenticationService.class,
             AuthenticationController.class, UserProfileController.class, AdminUserController.class,
             AdminRoleController.class, AdminPermissionController.class, AuditLogController.class,
             UserProfileService.class, AdminUserService.class, AdminRoleService.class, PermissionService.class,
             AuditLogServiceImpl.class, AuditLogWriter.class, CurrentUser.class, RbacPolicy.class,
-            GlobalExceptionHandler.class})
+            GlobalExceptionHandler.class, AccountSessionService.class, AccountRegistrationService.class,
+            VerificationMailService.class, AdminAccountImpact.class})
     static class Config {
+        @Bean AuthProperties authProperties() { return new AuthProperties(); }
+        @Bean AuthRateLimiter limiter() { return mock(AuthRateLimiter.class); }
+        @Bean JavaMailSender mailSender() { return mock(JavaMailSender.class); }
+        @Bean MutableClock clock() { return new MutableClock(); }
         @Bean
         DataSource dataSource() throws Exception { return TestDatabase.create(); }
 
@@ -133,11 +157,20 @@ class UserRbacIntegrationTest {
         }
 
         @Bean
-        JwtTokenProvider jwtTokenProvider() {
+        JwtTokenProvider jwtTokenProvider(Clock clock) {
             byte[] key = new byte[32];
             new SecureRandom().nextBytes(key);
-            return new JwtTokenProvider(Base64.getEncoder().encodeToString(key), 60_000L);
+            return new JwtTokenProvider(Base64.getEncoder().encodeToString(key), 60_000L, clock);
         }
+    }
+
+    static class MutableClock extends Clock {
+        private Instant now = Instant.now();
+        void reset() { now = Instant.now(); }
+        void advance(Duration duration) { now = now.plus(duration); }
+        @Override public ZoneId getZone() { return ZoneOffset.UTC; }
+        @Override public Clock withZone(ZoneId zone) { return Clock.fixed(now, zone); }
+        @Override public Instant instant() { return now; }
     }
 
     @Autowired private WebApplicationContext context;
@@ -150,22 +183,35 @@ class UserRbacIntegrationTest {
     @Autowired private UserRepository users;
     @Autowired private RbacPolicy policy;
     @Autowired private PlatformTransactionManager transactions;
+    @Autowired private MutableClock clock;
+    @Autowired private AuthRateLimiter limiter;
+    @Autowired private JavaMailSender mailSender;
+    @Autowired private VerificationMailService verificationMail;
     private MockMvc mvc;
     private JdbcTemplate jdbc;
     private static String passwordHash;
 
     @BeforeEach
     void setup() throws Exception {
+        clock.reset();
+        reset(limiter, mailSender);
         jdbc = new JdbcTemplate(dataSource);
         String catalog = Files.readString(Path.of("scripts/sql/V003__user_rbac_catalog.sql"));
         String supportAudit = Files.readString(Path.of("scripts/sql/V004__support_audit_read.sql"));
         if (passwordHash == null) passwordHash = encoder.encode(PASSWORD);
         new TransactionTemplate(transactions).executeWithoutResult(tx -> {
             // Các bảng khác trong schema test luôn rỗng; DELETE giữ fixture nhỏ và tránh TRUNCATE CASCADE 74 bảng.
-            jdbc.execute("DELETE FROM audit_logs; DELETE FROM user_roles; DELETE FROM role_permissions; "
-                    + "DELETE FROM users; DELETE FROM permissions; DELETE FROM roles");
+            jdbc.execute("DELETE FROM mail_events; DELETE FROM verification_tokens; "
+                    + "UPDATE refresh_tokens SET replaced_by=NULL; DELETE FROM refresh_tokens; "
+                    + "DELETE FROM audit_logs; DELETE FROM user_roles; DELETE FROM role_permissions; "
+                    + "DELETE FROM properties; DELETE FROM users; DELETE FROM permissions; DELETE FROM roles");
             jdbc.execute(catalog);
             jdbc.execute(supportAudit);
+            try {
+                jdbc.execute(Files.readString(Path.of("scripts/sql/V005__account_authentication.sql")));
+            } catch (java.io.IOException failure) {
+                throw new java.io.UncheckedIOException(failure);
+            }
             addUser(1, "admin", "ROLE_ADMIN");
             addUser(2, "admin2", "ROLE_ADMIN");
             addUser(34, "customer34", "ROLE_CUSTOMER");
@@ -189,8 +235,8 @@ class UserRbacIntegrationTest {
     private void addUser(long id, String username, String role) {
         jdbc.update("""
                 INSERT INTO users(id, username, full_name, email, phone, password_hash,
-                                  active, status, two_factor_enabled, token_version, version, created_at, updated_at)
-                VALUES (?, ?, ?, ?, '0901234567', ?, true, 'ACTIVE', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                                  active, status, two_factor_enabled, token_version, version, verified_at, created_at, updated_at)
+                VALUES (?, ?, ?, ?, '0901234567', ?, true, 'ACTIVE', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """, id, username, username, username + "@example.test", passwordHash);
         jdbc.update("INSERT INTO user_roles(user_id, role_id) SELECT ?, id FROM roles WHERE code=?", id, role);
     }
@@ -217,6 +263,492 @@ class UserRbacIntegrationTest {
     private MockHttpServletRequestBuilder auditRequest(String path) {
         return get(path).param("from", OffsetDateTime.now().minusHours(1).toString())
                 .param("to", OffsetDateTime.now().plusHours(1).toString());
+    }
+
+
+    private static final tools.jackson.databind.json.JsonMapper JSON =
+            tools.jackson.databind.json.JsonMapper.builder().build();
+
+    private ResultActions auth(String path, String body) throws Exception {
+        return mvc.perform(post("/api/v1/auth/" + path).contentType(MediaType.APPLICATION_JSON).content(body));
+    }
+
+    private String registerBody(String email) {
+        return """
+                {"fullName":"New Customer","email":"%s","password":"%s",
+                 "confirmPassword":"%s","termsAccepted":true}
+                """.formatted(email, PASSWORD, PASSWORD);
+    }
+
+    private void register(String email) throws Exception {
+        auth("register", registerBody(email)).andExpect(result -> assertEquals(202,
+                result.getResponse().getStatus(), result.getResponse().getContentAsString()));
+    }
+
+    private String verificationCode(String email) {
+        return jdbc.queryForObject("""
+                SELECT payload_snapshot->>'token' FROM mail_events
+                WHERE recipient_address=? ORDER BY id DESC LIMIT 1
+                """, String.class, email);
+    }
+
+    private ResultActions verifyCode(String email, String code) throws Exception {
+        return auth("verify", JSON.writeValueAsString(Map.of("email", email, "token", code)));
+    }
+
+    private tools.jackson.databind.JsonNode login(String email) throws Exception {
+        return JSON.readTree(auth("login", JSON.writeValueAsString(Map.of("email", email, "password", PASSWORD)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("data");
+    }
+
+    private ResultActions refresh(String raw) throws Exception {
+        return auth("refresh", JSON.writeValueAsString(Map.of("refreshToken", raw)));
+    }
+
+    private void rejectedAccess(String access) throws Exception {
+        mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + access))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void registrationToVerificationToLoginUsesNormalizedEmailAndSafeDefaults() throws Exception {
+        String email = "new@example.test";
+        register("  NeW@Example.Test  ");
+        assertEquals("PENDING_VERIFICATION", jdbc.queryForObject(
+                "SELECT status FROM users WHERE email=?", String.class, email));
+        assertEquals(false, jdbc.queryForObject("SELECT active FROM users WHERE email=?", Boolean.class, email));
+        assertEquals("ROLE_CUSTOMER", jdbc.queryForObject("""
+                SELECT r.code FROM roles r JOIN user_roles ur ON ur.role_id=r.id
+                JOIN users u ON u.id=ur.user_id WHERE u.email=?
+                """, String.class, email));
+        String hash = jdbc.queryForObject("SELECT password_hash FROM users WHERE email=?", String.class, email);
+        assertTrue(encoder.matches(PASSWORD, hash));
+        auth("login", JSON.writeValueAsString(Map.of("email", email, "password", PASSWORD)))
+                .andExpect(status().isUnauthorized());
+        String raw = verificationCode(email);
+        assertNotEquals(raw, jdbc.queryForObject("SELECT token_hash FROM verification_tokens", String.class));
+        verifyCode(" NEW@example.test ", raw).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+        assertNotNull(jdbc.queryForObject("SELECT verified_at FROM users WHERE email=?", Instant.class, email));
+        verifyCode(email, raw).andExpect(status().isBadRequest());
+        var session = login("NEW@example.test");
+        mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + session.get("accessToken").asText()))
+                .andExpect(status().isOk());
+        assertEquals(1, auditCount("USER_REGISTERED"));
+        assertEquals(1, auditCount("USER_EMAIL_VERIFIED"));
+        assertFalse(jdbc.queryForObject(
+                "SELECT string_agg(coalesce(after_state::text,''),'') FROM audit_logs", String.class).contains(raw));
+    }
+
+    @Test
+    void duplicateEmailIsCaseInsensitiveAndDoesNotCreateExtraMail() throws Exception {
+        register("new@example.test");
+        auth("register", registerBody("NEW@EXAMPLE.TEST")).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("EMAIL_ALREADY_EXISTS"));
+        assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM mail_events", Long.class));
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () -> jdbc.update(
+                "INSERT INTO users(username,full_name,email,password_hash,active,status,two_factor_enabled,token_version,version) "
+                + "VALUES ('case_duplicate','Duplicate','NEW@EXAMPLE.TEST',?,false,'PENDING_VERIFICATION',false,0,0)",
+                passwordHash));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"roles", "status", "active", "tokenVersion"})
+    void registrationRejectsClientSuppliedAdministrationFields(String field) throws Exception {
+        String value = switch (field) {
+            case "roles" -> "[\"ROLE_ADMIN\"]";
+            case "status" -> "\"ACTIVE\"";
+            case "active" -> "true";
+            default -> "99";
+        };
+        String body = registerBody("new@example.test").stripTrailing();
+        body = body.substring(0, body.lastIndexOf('}')) + ",\"" + field + "\":" + value + "}";
+        auth("register", body).andExpect(status().isBadRequest());
+        assertEquals(0L, jdbc.queryForObject("SELECT count(*) FROM users WHERE email='new@example.test'", Long.class));
+    }
+
+    @Test
+    void registrationRequiresTermsMatchingPasswordAndBcryptByteLimit() throws Exception {
+        auth("register", registerBody("new@example.test").replace("\"termsAccepted\":true", "\"termsAccepted\":false"))
+                .andExpect(status().isBadRequest());
+        auth("register", registerBody("new@example.test").replace("\"confirmPassword\":\"" + PASSWORD + "\"",
+                "\"confirmPassword\":\"different-password\"")).andExpect(status().isBadRequest());
+        String multibyte = "á".repeat(40);
+        auth("register", JSON.writeValueAsString(Map.of("fullName", "Name", "email", "new@example.test",
+                "password", multibyte, "confirmPassword", multibyte, "termsAccepted", true)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error.code").value("PASSWORD_TOO_LONG"));
+    }
+
+    @Test
+    void invalidVerificationAttemptsPersistAndRevokeAfterFiveFailures() throws Exception {
+        register("new@example.test");
+        String correct = verificationCode("new@example.test");
+        for (int i = 0; i < 5; i++) verifyCode("new@example.test", "wrong-" + i).andExpect(status().isBadRequest());
+        assertEquals(5, jdbc.queryForObject("SELECT attempts FROM verification_tokens", Integer.class));
+        assertNotNull(jdbc.queryForObject("SELECT revoked_at FROM verification_tokens", Instant.class));
+        verifyCode("new@example.test", correct).andExpect(status().isBadRequest());
+        assertNull(jdbc.queryForObject("SELECT verified_at FROM users WHERE email='new@example.test'", Instant.class));
+    }
+
+    @Test
+    void expiredCodeAndResendRespectCooldownAndReplaceOldCode() throws Exception {
+        register("new@example.test");
+        String first = verificationCode("new@example.test");
+        auth("resend-verification", "{\"email\":\"new@example.test\"}").andExpect(status().isOk());
+        assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM verification_tokens", Long.class));
+        clock.advance(Duration.ofMinutes(21));
+        verifyCode("new@example.test", first).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VERIFICATION_EXPIRED"));
+        auth("resend-verification", "{\"email\":\"NEW@example.test\"}").andExpect(status().isOk());
+        String second = verificationCode("new@example.test");
+        assertNotEquals(first, second);
+        assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM mail_events WHERE status='CANCELLED'", Long.class));
+        verifyCode("new@example.test", first).andExpect(status().isBadRequest());
+        verifyCode("new@example.test", second).andExpect(status().isOk());
+        String known = auth("resend-verification", "{\"email\":\"new@example.test\"}")
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String unknown = auth("resend-verification", "{\"email\":\"unknown@example.test\"}")
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertEquals(JSON.readTree(known).get("data"), JSON.readTree(unknown).get("data"));
+    }
+
+    @Test
+    void verificationDoesNotUnlockAccountAndAdminCannotBypassVerification() throws Exception {
+        register("new@example.test");
+        long userId = jdbc.queryForObject("SELECT id FROM users WHERE email='new@example.test'", Long.class);
+        jsonRequest(patch("/api/v1/admin/users/" + userId + "/status"), "admin",
+                "{\"version\":0,\"status\":\"ACTIVE\",\"reason\":\"Try activation\"}")
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.error.code").value("EMAIL_NOT_VERIFIED"));
+        jsonRequest(patch("/api/v1/admin/users/" + userId + "/status"), "admin",
+                "{\"version\":0,\"status\":\"LOCKED\",\"reason\":\"Review account\"}").andExpect(status().isOk());
+        verifyCode("new@example.test", verificationCode("new@example.test")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("LOCKED"));
+        auth("login", JSON.writeValueAsString(Map.of("email", "new@example.test", "password", PASSWORD)))
+                .andExpect(status().isUnauthorized());
+        long version = jdbc.queryForObject("SELECT version FROM users WHERE id=?", Long.class, userId);
+        jsonRequest(patch("/api/v1/admin/users/" + userId + "/status"), "admin",
+                "{\"version\":" + version + ",\"status\":\"ACTIVE\",\"reason\":\"Review complete\"}")
+                .andExpect(status().isOk());
+        login("new@example.test");
+        jsonRequest(patch("/api/v1/admin/users/" + userId + "/status"), "admin",
+                "{\"version\":" + (version + 1) + ",\"status\":\"PENDING_VERIFICATION\",\"reason\":\"Try reset\"}")
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void legacyActiveAccountWithoutVerificationMustVerifyOnce() throws Exception {
+        jdbc.update("UPDATE users SET verified_at=NULL WHERE id=34");
+        rejectedAccess(token("customer34"));
+        auth("login", JSON.writeValueAsString(Map.of("email", "customer34@example.test", "password", PASSWORD)))
+                .andExpect(status().isUnauthorized());
+        auth("resend-verification", "{\"email\":\"customer34@example.test\"}").andExpect(status().isOk());
+        verifyCode("customer34@example.test", verificationCode("customer34@example.test")).andExpect(status().isOk());
+        login("customer34@example.test");
+    }
+
+    @Test
+    void refreshRotatesWithAbsoluteExpiryAndReuseRevokesAllSessions() throws Exception {
+        var first = login("customer34@example.test");
+        var other = login("customer34@example.test");
+        String oldRefresh = first.get("refreshToken").asText();
+        assertNotEquals(oldRefresh, jdbc.queryForObject(
+                "SELECT token_hash FROM refresh_tokens ORDER BY id LIMIT 1", String.class));
+        Instant expiry = jdbc.queryForObject("SELECT expires_at FROM refresh_tokens ORDER BY id LIMIT 1", Instant.class);
+        clock.advance(Duration.ofSeconds(10));
+        var next = JSON.readTree(refresh(oldRefresh).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).get("data");
+        assertNotEquals(oldRefresh, next.get("refreshToken").asText());
+        assertEquals(expiry, jdbc.queryForObject(
+                "SELECT expires_at FROM refresh_tokens ORDER BY id DESC LIMIT 1", Instant.class));
+        refresh(oldRefresh).andExpect(status().isUnauthorized());
+        refresh(next.get("refreshToken").asText()).andExpect(status().isUnauthorized());
+        refresh(other.get("refreshToken").asText()).andExpect(status().isUnauthorized());
+        rejectedAccess(first.get("accessToken").asText());
+        rejectedAccess(next.get("accessToken").asText());
+        assertEquals(1, auditCount("REFRESH_TOKEN_REUSE_DETECTED"));
+        var freshLogin = login("customer34@example.test");
+        refresh(oldRefresh).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + freshLogin.get("accessToken").asText()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void expiredAccessDoesNotBlockRefreshAndRefreshCannotExceedSevenDays() throws Exception {
+        var first = login("customer34@example.test");
+        clock.advance(Duration.ofSeconds(61));
+        rejectedAccess(first.get("accessToken").asText());
+        var next = JSON.readTree(mvc.perform(post("/api/v1/auth/refresh")
+                .header("Authorization", "Bearer " + first.get("accessToken").asText())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(JSON.writeValueAsString(Map.of("refreshToken", first.get("refreshToken").asText()))))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
+                .andReturn().getResponse().getContentAsString()).get("data");
+        clock.advance(Duration.ofDays(7));
+        refresh(next.get("refreshToken").asText()).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void logoutRevokesEveryDeviceAndRepeatedLogoutCannotRevokeNewLogin() throws Exception {
+        var first = login("customer34@example.test");
+        var second = login("customer34@example.test");
+        String body = JSON.writeValueAsString(Map.of("refreshToken", first.get("refreshToken").asText()));
+        auth("logout", body).andExpect(status().isNoContent());
+        rejectedAccess(first.get("accessToken").asText());
+        rejectedAccess(second.get("accessToken").asText());
+        refresh(second.get("refreshToken").asText()).andExpect(status().isUnauthorized());
+        var fresh = login("customer34@example.test");
+        auth("logout", body).andExpect(status().isNoContent());
+        mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + fresh.get("accessToken").asText()))
+                .andExpect(status().isOk());
+        assertEquals(1, auditCount("USER_LOGGED_OUT"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"password", "status", "roles"})
+    void sensitiveChangesRevokeRefreshAsWellAsAccess(String change) throws Exception {
+        var session = login("customer34@example.test");
+        switch (change) {
+            case "password" -> jsonRequest(patch("/api/v1/users/me/password"), "customer34",
+                    "{\"version\":0,\"currentPassword\":\"" + PASSWORD + "\",\"newPassword\":\"Changed-password-2026\"}")
+                    .andExpect(status().isOk());
+            case "status" -> jsonRequest(patch("/api/v1/admin/users/34/status"), "admin",
+                    "{\"version\":0,\"status\":\"LOCKED\",\"reason\":\"Review account\"}")
+                    .andExpect(status().isOk());
+            case "roles" -> jsonRequest(put("/api/v1/admin/users/34/roles"), "admin",
+                    "{\"version\":0,\"roleIds\":[" + id("roles", "ROLE_SUPPORT") + "],\"reason\":\"Change team\"}")
+                    .andExpect(status().isOk());
+        }
+        refresh(session.get("refreshToken").asText()).andExpect(status().isUnauthorized());
+        rejectedAccess(session.get("accessToken").asText());
+    }
+
+    @Test
+    void concurrentRefreshCannotCreateTwoUsableSuccessors() throws Exception {
+        String refresh = login("customer34@example.test").get("refreshToken").asText();
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        var ready = new java.util.concurrent.CountDownLatch(2);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.Callable<Integer> task = () -> {
+            ready.countDown();
+            assertTrue(start.await(10, java.util.concurrent.TimeUnit.SECONDS));
+            return refresh(refresh).andReturn().getResponse().getStatus();
+        };
+        try {
+            var a = pool.submit(task);
+            var b = pool.submit(task);
+            assertTrue(ready.await(10, java.util.concurrent.TimeUnit.SECONDS));
+            start.countDown();
+            assertEquals(Set.of(200, 401), Set.of(a.get(20, java.util.concurrent.TimeUnit.SECONDS),
+                    b.get(20, java.util.concurrent.TimeUnit.SECONDS)));
+            assertEquals(0L, jdbc.queryForObject(
+                    "SELECT count(*) FROM refresh_tokens WHERE revoked_at IS NULL", Long.class));
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void smtpFailureKeepsRegistrationAndRetriesOutsideDatabaseTransaction() throws Exception {
+        register("new@example.test");
+        String code = verificationCode("new@example.test");
+        doThrow(new org.springframework.mail.MailSendException("SMTP offline"))
+                .doAnswer(call -> {
+                    assertFalse(org.springframework.transaction.support.TransactionSynchronizationManager
+                            .isActualTransactionActive());
+                    org.springframework.mail.SimpleMailMessage message = call.getArgument(0);
+                    assertTrue(message.getText().contains(code));
+                    return null;
+                }).when(mailSender).send(any(org.springframework.mail.SimpleMailMessage.class));
+        verificationMail.dispatch();
+        assertEquals("RETRY", jdbc.queryForObject("SELECT status FROM mail_events", String.class));
+        assertEquals("PENDING_VERIFICATION", jdbc.queryForObject(
+                "SELECT status FROM users WHERE email='new@example.test'", String.class));
+        clock.advance(Duration.ofSeconds(16));
+        verificationMail.dispatch();
+        assertEquals("SENT", jdbc.queryForObject("SELECT status FROM mail_events", String.class));
+        assertEquals("{}", jdbc.queryForObject("SELECT payload_snapshot::text FROM mail_events", String.class));
+        verify(mailSender, times(2)).send(any(org.springframework.mail.SimpleMailMessage.class));
+        verifyCode("new@example.test", code).andExpect(status().isOk());
+    }
+
+    @Test
+    void expiredMailIsCancelledWithoutSendingAndPurgesRawCode() throws Exception {
+        register("new@example.test");
+        clock.advance(Duration.ofMinutes(21));
+        verificationMail.dispatch();
+        assertEquals("CANCELLED", jdbc.queryForObject("SELECT status FROM mail_events", String.class));
+        assertEquals("{}", jdbc.queryForObject("SELECT payload_snapshot::text FROM mail_events", String.class));
+        verify(mailSender, times(0)).send(any(org.springframework.mail.SimpleMailMessage.class));
+    }
+
+    @Test
+    void verificationRollsBackWhenAuditCannotBeWritten() throws Exception {
+        register("new@example.test");
+        jdbc.execute("ALTER TABLE audit_logs ADD CONSTRAINT reject_verify_test CHECK (action <> 'USER_EMAIL_VERIFIED')");
+        try {
+            verifyCode("new@example.test", verificationCode("new@example.test")).andExpect(status().isConflict());
+            assertNull(jdbc.queryForObject("SELECT verified_at FROM users WHERE email='new@example.test'", Instant.class));
+            assertNull(jdbc.queryForObject("SELECT used_at FROM verification_tokens", Instant.class));
+        } finally {
+            jdbc.execute("ALTER TABLE audit_logs DROP CONSTRAINT reject_verify_test");
+        }
+    }
+
+    @Test
+    void rateLimitErrorsAndFilterErrorsHaveConsistentTraceIdWithoutSecrets() throws Exception {
+        String trace = UUID.randomUUID().toString();
+        doThrow(new DomainException(org.springframework.http.HttpStatus.TOO_MANY_REQUESTS,
+                "RATE_LIMITED", "Try later")).when(limiter).check(eq("login"), anyString(), anyString());
+        mvc.perform(post("/api/v1/auth/login").header("X-Request-ID", trace).contentType(MediaType.APPLICATION_JSON)
+                .content(JSON.writeValueAsString(Map.of("email", "customer34@example.test", "password", PASSWORD))))
+                .andExpect(status().isTooManyRequests()).andExpect(header().string("X-Request-ID", trace))
+                .andExpect(jsonPath("$.error.code").value("RATE_LIMITED"))
+                .andExpect(jsonPath("$.error.traceId").value(trace));
+        mvc.perform(get("/api/v1/users/me").header("X-Request-ID", trace).header("Authorization", "Bearer invalid"))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.error.traceId").value(trace));
+    }
+
+    @Test
+    void adminCannotManageAnAdministratorWithPermissionsOutsideOwnScope() throws Exception {
+        jdbc.update("""
+                INSERT INTO permissions(code,name,created_at,updated_at,version)
+                VALUES ('EXTRA_SCOPE','Extra scope',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)
+                """);
+        jdbc.update("""
+                INSERT INTO roles(code,name,created_at,updated_at,version)
+                VALUES ('ROLE_EXTRA','Extra role',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)
+                """);
+        jdbc.update("INSERT INTO role_permissions(role_id,permission_id) VALUES (?,?)",
+                id("roles", "ROLE_EXTRA"), id("permissions", "EXTRA_SCOPE"));
+        jdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES (2,?)", id("roles", "ROLE_EXTRA"));
+        jsonRequest(patch("/api/v1/admin/users/2/status"), "admin",
+                "{\"version\":0,\"status\":\"LOCKED\",\"reason\":\"Outside scope\"}").andExpect(status().isForbidden());
+        jsonRequest(patch("/api/v1/admin/users/2/profile"), "admin",
+                "{\"version\":0,\"fullName\":\"Changed\",\"reason\":\"Outside scope\"}").andExpect(status().isForbidden());
+    }
+
+
+    @Test
+    void statusChangeWarnsAboutOwnedPropertyAndKeepsOwnership() throws Exception {
+        jdbc.update("""
+                INSERT INTO properties(owner_id,name,address,city,country,timezone,checkin_local,checkout_local,
+                                       status,version,created_at,updated_at)
+                VALUES (34,'Test property','Address','Ha Noi','VN','Asia/Bangkok','14:00','12:00',
+                        'DRAFT',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+                """);
+        mvc.perform(get("/api/v1/admin/users/34").header("Authorization", "Bearer " + token("admin")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.warnings", hasSize(1)));
+        jsonRequest(patch("/api/v1/admin/users/34/status"), "admin",
+                "{\"version\":0,\"status\":\"LOCKED\",\"reason\":\"Review owner\"}")
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.warnings", hasSize(1)));
+        assertEquals(34L, jdbc.queryForObject("SELECT owner_id FROM properties", Long.class));
+    }
+
+    @Test
+    @WithMockUser(username = "admin2", authorities = {"ROLE_ADMIN", "USER_MANAGE"})
+    void unverifiedAdministratorDoesNotCountAsAnAvailableAdministrator() {
+        jdbc.update("UPDATE users SET verified_at=NULL WHERE id=2");
+        new TransactionTemplate(transactions).executeWithoutResult(tx -> {
+            User last = users.findById(1L).orElseThrow();
+            BusinessException error = assertThrows(BusinessException.class,
+                    () -> policy.preserveLastAdmin(last, false));
+            assertEquals(409, error.getStatus());
+        });
+    }
+
+    @Test
+    void newMigrationIsIdempotentAndKeepsExistingTemplateContent() throws Exception {
+        jdbc.update("UPDATE email_template_versions SET subject='Customized subject'");
+        jdbc.execute(Files.readString(Path.of("scripts/sql/V005__account_authentication.sql")));
+        assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM email_templates", Long.class));
+        assertEquals("Customized subject", jdbc.queryForObject("SELECT subject FROM email_template_versions", String.class));
+    }
+
+    @Test
+    void parallelRegistrationOfSameNormalizedEmailCreatesOneAccountAndOneMail() throws Exception {
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try {
+            var first = pool.submit(() -> {
+                start.await();
+                return auth("register", registerBody("parallel@example.test")).andReturn().getResponse().getStatus();
+            });
+            var second = pool.submit(() -> {
+                start.await();
+                return auth("register", registerBody("PARALLEL@example.test")).andReturn().getResponse().getStatus();
+            });
+            start.countDown();
+            List<Integer> results = new ArrayList<>(List.of(
+                    first.get(30, java.util.concurrent.TimeUnit.SECONDS),
+                    second.get(30, java.util.concurrent.TimeUnit.SECONDS)));
+            Collections.sort(results);
+            assertEquals(List.of(202, 409), results);
+            assertEquals(1L, jdbc.queryForObject(
+                    "SELECT count(*) FROM users WHERE email='parallel@example.test'", Long.class));
+            assertEquals(1L, jdbc.queryForObject("SELECT count(*) FROM mail_events", Long.class));
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void verificationWorkerDeliversThroughRealSmtpTransport() throws Exception {
+        register("new@example.test");
+        String code = verificationCode("new@example.test");
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try (var server = new java.net.ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1"))) {
+            server.setSoTimeout(5_000);
+            var delivered = executor.submit(() -> receiveSmtp(server));
+            var smtp = new org.springframework.mail.javamail.JavaMailSenderImpl();
+            smtp.setHost("127.0.0.1");
+            smtp.setPort(server.getLocalPort());
+            smtp.setDefaultEncoding("UTF-8");
+            smtp.getJavaMailProperties().setProperty("mail.smtp.connectiontimeout", "3000");
+            smtp.getJavaMailProperties().setProperty("mail.smtp.timeout", "3000");
+            doAnswer(call -> {
+                smtp.send((org.springframework.mail.SimpleMailMessage) call.getArgument(0));
+                return null;
+            }).when(mailSender).send(any(org.springframework.mail.SimpleMailMessage.class));
+            verificationMail.dispatch();
+            String data = delivered.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            var message = new jakarta.mail.internet.MimeMessage(jakarta.mail.Session.getInstance(new Properties()),
+                    new java.io.ByteArrayInputStream(data.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            assertEquals("new@example.test", message.getAllRecipients()[0].toString());
+            assertTrue(message.getContent().toString().contains(code));
+            assertEquals("SENT", jdbc.queryForObject("SELECT status FROM mail_events", String.class));
+            assertEquals("{}", jdbc.queryForObject("SELECT payload_snapshot::text FROM mail_events", String.class));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    /** SMTP receiver tối thiểu chỉ dùng trong test, bind loopback và không ghi nội dung thư ra log. */
+    private static String receiveSmtp(java.net.ServerSocket server) throws Exception {
+        try (var socket = server.accept();
+             var input = new java.io.BufferedReader(new java.io.InputStreamReader(socket.getInputStream(),
+                     java.nio.charset.StandardCharsets.UTF_8));
+             var output = new java.io.PrintWriter(socket.getOutputStream(), true,
+                     java.nio.charset.StandardCharsets.US_ASCII)) {
+            socket.setSoTimeout(5_000);
+            output.println("220 localhost test SMTP");
+            StringBuilder message = new StringBuilder();
+            String line;
+            while ((line = input.readLine()) != null) {
+                if (line.equals("DATA")) {
+                    output.println("354 Send message");
+                    while ((line = input.readLine()) != null && !line.equals(".")) {
+                        message.append(line).append("\r\n");
+                    }
+                    output.println("250 Accepted");
+                } else if (line.equals("QUIT")) {
+                    output.println("221 Bye");
+                    break;
+                } else {
+                    output.println("250 localhost");
+                }
+            }
+            return message.toString();
+        }
     }
 
     @Test
@@ -351,11 +883,11 @@ class UserRbacIntegrationTest {
     }
 
     @Test
-    void adminCanCreateInactiveCustomerWithHashedPasswordAndSeparateRoleApi() throws Exception {
+    void adminCanCreatePendingCustomerWithHashedPasswordAndSeparateRoleApi() throws Exception {
         jsonRequest(post("/api/v1/admin/users"), "admin", """
                 {"username":"new_customer","fullName":"New Customer","email":"new@example.test",
                  "password":"New-password-2026","reason":"Tạo tài khoản theo yêu cầu"}
-                """).andExpect(status().isCreated()).andExpect(jsonPath("$.data.status").value("IN_ACTIVE"))
+                """).andExpect(status().isCreated()).andExpect(jsonPath("$.data.status").value("PENDING_VERIFICATION"))
                 .andExpect(jsonPath("$.data.roles", contains("ROLE_CUSTOMER")));
         String hash = jdbc.queryForObject("SELECT password_hash FROM users WHERE username='new_customer'", String.class);
         assertTrue(encoder.matches("New-password-2026", hash));

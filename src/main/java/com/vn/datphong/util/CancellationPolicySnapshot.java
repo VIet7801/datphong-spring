@@ -10,16 +10,20 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Ảnh chụp chính sách hủy tại thời điểm đặt. Được lưu thành chuỗi trong bookings.cancellation_policy_snapshot
+ * Ảnh chụp chính sách hủy tại thời điểm đặt, lưu JSON trong bookings.cancellation_policy_snapshot
  * nên HOST sửa chính sách/giờ check-in về sau không làm đổi phí của booking đã tạo.
  *
- * Định dạng: v1|tên|múi giờ|HH:mm|ngày:phần trăm hoàn,...   ví dụ  v1|Linh hoạt|Asia/Bangkok|14:00|7:100,3:50,0:0
+ * Snapshot mới dùng JSON; vẫn đọc định dạng v1|... của code cũ và JSON do bộ seed tạo.
  * Quy tắc: tính số ngày đầy đủ từ lúc hủy đến mốc nhận phòng (theo múi giờ cơ sở); chọn rule có
  * daysBefore lớn nhất mà số ngày còn lại >= daysBefore. Không rule nào khớp hoặc đã quá mốc nhận phòng -> hoàn 0%.
  */
 public final class CancellationPolicySnapshot {
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
     public record Rule(int daysBeforeCheckin, BigDecimal refundPercent) {
     }
@@ -53,20 +57,18 @@ public final class CancellationPolicySnapshot {
     }
 
     public String serialize() {
-        StringBuilder rulesPart = new StringBuilder();
-        for (Rule r : rules) {
-            if (rulesPart.length() > 0) {
-                rulesPart.append(',');
-            }
-            rulesPart.append(r.daysBeforeCheckin()).append(':').append(r.refundPercent().stripTrailingZeros().toPlainString());
-        }
-        return "v1|" + name + "|" + zone.getId() + "|" + checkInTime + "|" + rulesPart;
+        return JSON.writeValueAsString(Map.of("revision", 1, "name", name, "timezone", zone.getId(),
+                "checkinLocal", checkInTime.toString(), "rules", rules));
     }
 
     public static CancellationPolicySnapshot parse(String text) {
         if (text == null || text.isBlank()) {
             // Không có snapshot: không hoàn tiền là hướng an toàn cho nền tảng, nhưng báo rõ để hiển thị.
             return of("Không hoàn tiền", ZoneId.of("UTC"), LocalTime.of(14, 0), List.of());
+        }
+        text = text.trim();
+        if (!text.startsWith("v1|")) {
+            return parseJson(text);
         }
         String[] parts = text.split("\\|", -1);
         if (parts.length != 5 || !"v1".equals(parts[0])) {
@@ -80,6 +82,33 @@ public final class CancellationPolicySnapshot {
             }
         }
         return of(parts[1], ZoneId.of(parts[2]), LocalTime.parse(parts[3]), parsed);
+    }
+
+    private static CancellationPolicySnapshot parseJson(String text) {
+        try {
+            JsonNode node = JSON.readTree(text);
+            if (node.isTextual()) return parse(node.asText());
+            if (!node.isObject() || node.path("revision").asInt(-1) != 1
+                    || !node.path("timezone").isTextual() || !node.path("checkinLocal").isTextual()
+                    || !node.path("rules").isArray()) {
+                throw new IllegalArgumentException("Snapshot chính sách hủy không hợp lệ");
+            }
+            List<Rule> parsed = new ArrayList<>();
+            for (JsonNode rule : node.path("rules")) {
+                if (!rule.path("daysBeforeCheckin").isIntegralNumber()
+                        || !rule.path("refundPercent").isNumber()) {
+                    throw new IllegalArgumentException("Rule chính sách hủy không hợp lệ");
+                }
+                parsed.add(new Rule(rule.path("daysBeforeCheckin").intValue(),
+                        new BigDecimal(rule.path("refundPercent").asText())));
+            }
+            String name = node.hasNonNull("name") ? node.path("name").asText()
+                    : node.path("policyCode").asText("Chính sách hủy");
+            return of(name, ZoneId.of(node.path("timezone").asText()),
+                    LocalTime.parse(node.path("checkinLocal").asText()), parsed);
+        } catch (RuntimeException invalid) {
+            throw new IllegalArgumentException("Snapshot chính sách hủy không hợp lệ", invalid);
+        }
     }
 
     public String getName() {

@@ -3,6 +3,7 @@ package com.vn.datphong.service.Impl;
 import com.vn.datphong.entity.FakeBankAccount;
 import com.vn.datphong.entity.FakeBankTransaction;
 import com.vn.datphong.entity.FakeBankWebhookEvent;
+import com.vn.datphong.exception.DomainException;
 import com.vn.datphong.repository.FakeBankAccountRepository;
 import com.vn.datphong.repository.FakeBankTransactionRepository;
 import com.vn.datphong.repository.FakeBankWebhookEventRepository;
@@ -17,6 +18,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.Objects;
 
 
 @Service
@@ -100,8 +102,16 @@ public class FakeBankServiceImpl implements FakeBankService {
     @Override
     @Transactional
     public TxResult refund(String idempotencyKey, String debitReference, BigDecimal amount) {
+        if (amount == null || amount.signum() <= 0) {
+            throw DomainException.badRequest("VALIDATION_ERROR", "Số tiền hoàn phải dương");
+        }
         Optional<FakeBankTransaction> prior = transactions.findByIdempotencyKey(idempotencyKey);
         if (prior.isPresent()) {
+            FakeBankTransaction existing = prior.get();
+            if (!"REFUND".equals(existing.getType()) || !Objects.equals(existing.getRelatedReference(), debitReference)
+                    || existing.getAmount().compareTo(amount) != 0) {
+                throw DomainException.conflict("IDEMPOTENCY_CONFLICT", "Mã giao dịch ngân hàng đã được dùng cho yêu cầu khác");
+            }
             return toResult(prior.get());
         }
         if (faults.consumeRefundFailure()) {

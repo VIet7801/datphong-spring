@@ -2,7 +2,7 @@
 
 Bộ dữ liệu `uc-demo-v1`, ngày tạo: 2026-10-20 (Asia/Ho_Chi_Minh).
 
-Đăng nhập bằng **username**, gọi `POST /api/auth/login`. Tất cả 10 tài khoản đều `ACTIVE`, `active=true`, không bật 2FA.
+Đăng nhập bằng email hoặc **username** qua `POST /api/v1/auth/login`. Các tài khoản demo được seed ACTIVE/active=true; từ 23/10/2026 còn bắt buộc có `verified_at`. Tài khoản chưa xác minh cần gọi `/api/v1/auth/resend-verification`, nhận mã qua SMTP thử rồi gọi `/api/v1/auth/verify`. Xem [luồng A–Z](BAO_CAO_USER_PERMISSION_AUDIT_LOG.md).
 
 | Role | Username | Email | Mật khẩu trước khi hash |
 |---|---|---|---|

@@ -48,7 +48,8 @@ public class FakeBankGateway {
         try {
             r = bank.refund(idempotencyKey, debitReference, amount);
         } catch (DataIntegrityViolationException dup) {
-            r = bank.query(idempotencyKey).orElseThrow(() -> dup);
+            // Gọi lại để bank kiểm tra cả loại giao dịch, payment gốc và số tiền của key vừa được tạo.
+            r = bank.refund(idempotencyKey, debitReference, amount);
         }
         if (r.success() && bank.shouldTimeoutAfterRefund()) {
             throw new BankTimeoutException("Bank không phản hồi kịp sau khi hoàn tiền (mô phỏng)");
