@@ -1,147 +1,138 @@
 package com.vn.datphong.exception;
 
 import com.vn.datphong.dto.response.ApiResponse;
+import jakarta.validation.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import jakarta.persistence.OptimisticLockException;
-import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Nhánh trả lỗi của Spring MVC khi controller/service ném exception hoặc validation thất bại.
- * Lỗi filter trả bằng response.sendError(...) không được tự động bọc bởi advice này.
- * Dùng một advice thống nhất cho lỗi controller/service.
+ * Nhánh trả lỗi của Spring MVC. Định dạng thống nhất: success=false, message, error{code, details, traceId}.
+ * Lỗi phát sinh trong filter bảo mật được ghi bởi JsonErrorWriter với cùng cấu trúc.
+ * Không bao giờ trả stack trace hoặc message nội bộ của exception không lường trước.
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
-    public ResponseEntity<ApiResponse<?>> handleMissingEndpoint(Exception ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(
-                "API hoac tai nguyen khong ton tai", new ApiError("RESOURCE_NOT_FOUND", null)));
+    private static ResponseEntity<ApiResponse<?>> build(HttpStatus status, String message, String code, Object details) {
+        return ResponseEntity.status(status).body(ApiResponse.error(message, new ApiError(code, details)));
     }
 
-    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class,
-            HandlerMethodValidationException.class})
-    public ResponseEntity<ApiResponse<?>> handleInvalidInput(Exception ex) {
-        return ResponseEntity.badRequest().body(ApiResponse.error(
-                "Du lieu khong hop le hoac chua truong khong duoc phep", new ApiError("VALIDATION_ERROR", null)));
-    }
-
-    @ExceptionHandler({ObjectOptimisticLockingFailureException.class, OptimisticLockException.class})
-    public ResponseEntity<ApiResponse<?>> handleVersionConflict(Exception ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(
-                "Du lieu da thay doi, hay tai lai", new ApiError("VERSION_CONFLICT", null)));
-    }
-
-    @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ApiResponse<?>> handleIntegrityConflict(DataIntegrityViolationException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(
-                "Du lieu trung hoac dang duoc su dung", new ApiError("DATA_CONFLICT", null)));
+    @ExceptionHandler(DomainException.class)
+    public ResponseEntity<ApiResponse<?>> handleDomain(DomainException ex) {
+        return build(ex.getStatus(), ex.getMessage(), ex.getCode(), ex.getDetails());
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<?>> handleAccessDenied(AccessDeniedException ex) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.error("Khong du quyen truy cap", new ApiError("FORBIDDEN", null)));
+        return build(HttpStatus.FORBIDDEN, "Không đủ quyền truy cập", "FORBIDDEN", null);
     }
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<ApiResponse<?>> handleAuthentication(AuthenticationException ex) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error("Chua xac thuc", new ApiError("UNAUTHORIZED", null)));
+        return build(HttpStatus.UNAUTHORIZED, "Chưa xác thực", "UNAUTHORIZED", null);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<?>> handleValidation(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();
+        ex.getBindingResult().getFieldErrors().forEach(e -> errors.put(e.getField(), e.getDefaultMessage()));
+        return build(HttpStatus.BAD_REQUEST, "Dữ liệu không hợp lệ", "VALIDATION_ERROR", errors);
+    }
 
-        ex.getBindingResult()
-                .getFieldErrors()
-                .forEach(error ->
-                        errors.put(error.getField(), error.getDefaultMessage())
-                );
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiResponse<?>> handleConstraintViolation(ConstraintViolationException ex) {
+        return build(HttpStatus.BAD_REQUEST, "Dữ liệu không hợp lệ", "VALIDATION_ERROR", ex.getMessage());
+    }
 
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(
-                        "Du lieu khong hop le",
-                        new ApiError("VALIDATION_ERROR", errors)
-                ));
+    @ExceptionHandler({HttpMessageNotReadableException.class, ServletRequestBindingException.class,
+            MethodArgumentTypeMismatchException.class})
+    public ResponseEntity<ApiResponse<?>> handleBadInput(Exception ex) {
+        return build(HttpStatus.BAD_REQUEST, "Yêu cầu không hợp lệ hoặc thiếu tham số", "VALIDATION_ERROR", null);
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<?>> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        return build(HttpStatus.METHOD_NOT_ALLOWED, "Phương thức không được hỗ trợ", "METHOD_NOT_ALLOWED", null);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiResponse<?>> handleMediaType(HttpMediaTypeNotSupportedException ex) {
+        return build(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Kiểu nội dung không được hỗ trợ", "UNSUPPORTED_MEDIA_TYPE", null);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<?>> handleNoResource(NoResourceFoundException ex) {
+        return build(HttpStatus.NOT_FOUND, "Không tìm thấy tài nguyên", "RESOURCE_NOT_FOUND", null);
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<?>> handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
+        return build(HttpStatus.CONFLICT, "Dữ liệu đã được thay đổi bởi người khác, hãy tải lại và thử lại",
+                "VERSION_CONFLICT", null);
+    }
+
+    @ExceptionHandler(PessimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<?>> handleLockTimeout(PessimisticLockingFailureException ex) {
+        log.warn("Lock timeout/deadlock: {}", ex.getMessage());
+        return build(HttpStatus.CONFLICT, "Hệ thống đang bận xử lý cùng tài nguyên, vui lòng thử lại", "RESOURCE_BUSY", null);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<?>> handleIntegrity(DataIntegrityViolationException ex) {
+        log.warn("Vi phạm ràng buộc dữ liệu: {}", ex.getMostSpecificCause().getMessage());
+        return build(HttpStatus.CONFLICT, "Dữ liệu xung đột với trạng thái hiện tại", "CONFLICT", null);
     }
 
     @ExceptionHandler(ResourceNotFoundExcept.class)
     public ResponseEntity<ApiResponse<?>> handleResourceNotFound(ResourceNotFoundExcept ex) {
-        return ResponseEntity
-                .status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.error(
-                        "Khong ton tai",
-                        new ApiError("RESOURCE_NOT_FOUND", ex.getMessage())
-                ));
+        return build(HttpStatus.NOT_FOUND, "Không tồn tại", "RESOURCE_NOT_FOUND", ex.getMessage());
     }
 
     @ExceptionHandler(BadRequestExcept.class)
     public ResponseEntity<ApiResponse<?>> handleBadRequest(BadRequestExcept ex) {
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error(
-                        "Yeu cau khong hop le",
-                        new ApiError("BAD_REQUEST", ex.getMessage())
-                ));
+        return build(HttpStatus.BAD_REQUEST, "Yêu cầu không hợp lệ", "BAD_REQUEST", ex.getMessage());
     }
 
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<ApiResponse<?>> handleUnauthorized(UnauthorizedException ex) {
-        return ResponseEntity
-                .status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error(
-                        "Chua xac thuc",
-                        new ApiError("UNAUTHORIZED", ex.getMessage())
-                ));
+        return build(HttpStatus.UNAUTHORIZED, "Chưa xác thực", "UNAUTHORIZED", ex.getMessage());
     }
 
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<ApiResponse<?>> handleValidationException(ValidationException ex) {
         Object details = ex.getErrorMap() != null ? ex.getErrorMap() : ex.getErrors();
-
-        return ResponseEntity
-                .status(HttpStatus.UNPROCESSABLE_ENTITY)
-                .body(ApiResponse.error(
-                        ex.getMessage(),
-                        new ApiError("VALIDATION_ERROR", details)
-                ));
+        return build(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage(), "VALIDATION_ERROR", details);
     }
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<?>> handleBusinessException(BusinessException ex) {
-        return ResponseEntity
-                .status(ex.getStatus())
-                .body(ApiResponse.error(
-                        ex.getMessage(),
-                        new ApiError(ex.getCode(), ex.getMessage())
-                ));
+        HttpStatus status = HttpStatus.resolve(ex.getStatus());
+        return build(status == null ? HttpStatus.BAD_REQUEST : status, ex.getMessage(), "BUSINESS_ERROR", ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<?>> handleException(Exception ex) {
-        return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error(
-                        "Loi he thong",
-                        new ApiError("INTERNAL_SERVER_ERROR", null)
-                ));
+        log.error("Lỗi hệ thống không lường trước", ex);
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "Lỗi hệ thống", "INTERNAL_SERVER_ERROR", null);
     }
 }

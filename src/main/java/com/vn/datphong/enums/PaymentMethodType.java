@@ -27,5 +27,5 @@ public enum PaymentMethodType {
     GOOGLE_PAY,
 
     /** Thanh toán ghi nợ qua dịch vụ Fake Bank theo thiết kế lõi. */
-    FAKE_BANK_DEBIT
+    FAKE_BANK
 }

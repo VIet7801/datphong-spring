@@ -5,18 +5,17 @@ import com.vn.datphong.dto.response.HostBookingResponse;
 import com.vn.datphong.dto.response.PageResponse;
 import com.vn.datphong.service.HostBookingService;
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 @RestController
 @RequestMapping("/api/host/bookings")
+@RequiredArgsConstructor
 public class HostBookingController {
     private final HostBookingService service;
 
-    public HostBookingController(HostBookingService service) {
-        this.service = service;
-    }
 
     @GetMapping
     public PageResponse<HostBookingResponse> list(@RequestParam(required = false) Long propertyId, @RequestParam(required = false) String status,

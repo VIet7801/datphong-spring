@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDateTime;
 
 @Data
 @NoArgsConstructor
@@ -28,8 +29,10 @@ public class PaymentResponse {
     private String providerReference;
     private String failureCode;
     private String failureMessage;
-    private Instant paidAt;
-    private Instant capturedAt;
+    private LocalDateTime paidAt;
+    private LocalDateTime createdAt;
+    private java.math.BigDecimal refundedAmount;
+    private LocalDateTime capturedAt;
     //url để fe redirect sang vnpay/momo
     private String paymentUrl;
 }

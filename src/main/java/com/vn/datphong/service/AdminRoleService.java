@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -97,7 +98,7 @@ public class AdminRoleService {
                         .role(role).permission(p).build()).toList());
         links.flush();
         // Thay đổi join table cũng phải làm version của role tăng.
-        role.setUpdatedAt(Instant.now());
+        role.setUpdatedAt(LocalDateTime.now());
         roles.flush();
         Set<String> after = selected.stream().map(Permission::getCode).collect(Collectors.toSet());
         audit.write("ROLE_PERMISSIONS_CHANGED", "ROLE", id,
