@@ -16,9 +16,7 @@ try {
     $JavaHome = Resolve-LocalJavaHome $JavaHome
     $env:PATH = "$JavaHome\bin;$env:SystemRoot\System32;$env:SystemRoot\System32\WindowsPowerShell\v1.0;$originalPath"
     if (-not $JdbcJar) {
-        $JdbcJar = Get-ChildItem -Path (Join-Path $projectDirectory 'target/schema-lib/postgresql-*.jar'), (Join-Path $env:USERPROFILE '.m2/repository/org/postgresql/postgresql/*/postgresql-*.jar') -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -notmatch '(sources|javadoc)' } |
-            Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName
+        $JdbcJar = Find-LocalJar @((Join-Path $projectDirectory 'target/schema-lib'), (Join-Path $env:USERPROFILE '.m2/repository/org/postgresql/postgresql')) 'postgresql-*.jar'
     }
     if (-not $JdbcJar -or -not (Test-Path -LiteralPath $JdbcJar)) {
         throw 'PostgreSQL JDBC is missing; run .\mvnw.cmd compile or pass -JdbcJar.'

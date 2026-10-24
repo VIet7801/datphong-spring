@@ -28,6 +28,17 @@ function Resolve-LocalDocker {
     throw 'Docker Desktop was not found. Install it and add docker.exe to PATH.'
 }
 
+function Find-LocalJar([string[]]$roots, [string]$filter) {
+    foreach ($root in $roots) {
+        if (-not (Test-Path -LiteralPath $root)) { continue }
+        $jar = Get-ChildItem -LiteralPath $root -Recurse -Filter $filter |
+            Where-Object { $_.Name -notmatch '-(sources|javadoc)\.jar$' } |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        if ($jar) { return $jar.FullName }
+    }
+    return $null
+}
+
 function Import-LocalComposeEnvironment([string]$docker) {
     $json = & $docker compose config --format json
     if ($LASTEXITCODE -ne 0) { throw 'Cannot read Docker Compose configuration.' }

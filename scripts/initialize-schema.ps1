@@ -5,6 +5,7 @@
 
 $ErrorActionPreference = 'Stop'
 $projectDirectory = Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot 'local-environment.ps1')
 $originalJavaHome = $env:JAVA_HOME
 $originalPath = $env:PATH
 $originalOutputEncoding = $OutputEncoding
@@ -12,28 +13,6 @@ $originalConsoleEncoding = [Console]::OutputEncoding
 $datasourceNames = @('SPRING_DATASOURCE_URL', 'SPRING_DATASOURCE_USERNAME', 'SPRING_DATASOURCE_PASSWORD')
 $originalDatasource = @{}
 foreach ($name in $datasourceNames) { $originalDatasource[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
-
-function Find-JavaHome {
-    if ($JavaHome) { $candidates = @($JavaHome) }
-    else {
-        $candidates = @()
-        $javaCommand = Get-Command java.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($javaCommand) { $candidates += Split-Path (Split-Path $javaCommand.Source -Parent) -Parent }
-        foreach ($root in @("$env:ProgramFiles\Java", "$env:ProgramFiles\Eclipse Adoptium", "$env:ProgramFiles\Microsoft", "$env:USERPROFILE\.jdks")) {
-            if (Test-Path -LiteralPath $root) {
-                $candidates += Get-ChildItem -LiteralPath $root -Directory | Sort-Object Name | Select-Object -ExpandProperty FullName
-            }
-        }
-    }
-    foreach ($candidate in $candidates) {
-        $releaseFile = Join-Path $candidate 'release'
-        if ((Test-Path -LiteralPath (Join-Path $candidate 'bin/javac.exe')) -and (Test-Path -LiteralPath $releaseFile)) {
-            $release = [IO.File]::ReadAllText($releaseFile)
-            if ($release -match 'JAVA_VERSION="(\d+)' -and [int]$Matches[1] -ge 17) { return $candidate }
-        }
-    }
-    throw 'Không tìm thấy JDK 17 trở lên. Hãy cài JDK và đặt JAVA_HOME, hoặc truyền -JavaHome vào script.'
-}
 
 function Read-DatasourceSetting([string]$name) {
     $override = [Environment]::GetEnvironmentVariable($name, 'Process')
@@ -57,7 +36,7 @@ try {
     $utf8 = New-Object Text.UTF8Encoding($false)
     [Console]::OutputEncoding = $utf8
     $OutputEncoding = $utf8
-    $env:JAVA_HOME = Find-JavaHome
+    $env:JAVA_HOME = Resolve-LocalJavaHome $JavaHome
     $env:PATH = "$env:JAVA_HOME\bin;$env:SystemRoot\System32;$env:SystemRoot\System32\WindowsPowerShell\v1.0;$originalPath"
     $javaExecutable = Join-Path $env:JAVA_HOME 'bin/java.exe'
     $script:configuration = [IO.File]::ReadAllText((Join-Path $projectDirectory 'src/main/resources/application.yaml'))
@@ -114,16 +93,16 @@ try {
     New-Item -ItemType Directory -Force -Path $auditDirectory | Out-Null
     if (-not $JdbcJar) {
         $driverDirectory = Join-Path $projectDirectory 'target/schema-lib'
-        $driver = Get-ChildItem -LiteralPath $driverDirectory -Filter 'postgresql-*.jar' -ErrorAction SilentlyContinue | Select-Object -First 1
+        $driver = Find-LocalJar @($driverDirectory, (Join-Path $env:USERPROFILE '.m2/repository/org/postgresql/postgresql')) 'postgresql-*.jar'
         if (-not $driver) {
             Write-Host 'Đang chuẩn bị JDBC bằng Maven Wrapper; lần đầu cần Internet...'
             $mavenArguments = @('-B', '-ntp', 'dependency:copy-dependencies', '-DincludeGroupIds=org.postgresql', '-DincludeArtifactIds=postgresql', '-DincludeScope=runtime', "-DoutputDirectory=$driverDirectory")
             & (Join-Path $projectDirectory 'mvnw.cmd') @mavenArguments *> (Join-Path $auditDirectory 'maven-driver.log')
             if ($LASTEXITCODE -ne 0) { throw 'Không tải được JDBC. Xem target/schema-audit/maven-driver.log.' }
-            $driver = Get-ChildItem -LiteralPath $driverDirectory -Filter 'postgresql-*.jar' | Select-Object -First 1
+            $driver = Find-LocalJar @($driverDirectory) 'postgresql-*.jar'
         }
         if (-not $driver) { throw 'Maven chưa tạo được tệp JDBC PostgreSQL.' }
-        $JdbcJar = $driver.FullName
+        $JdbcJar = $driver
     }
     if (-not (Test-Path -LiteralPath $JdbcJar -PathType Leaf)) { throw 'Không tìm thấy tệp JAR được truyền qua -JdbcJar.' }
 
