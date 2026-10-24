@@ -1,5 +1,10 @@
 # Khởi tạo entity và schema theo catalog
 
+> Đây là tài liệu baseline 74 bảng. Với code hiện tại, máy Windows mới dùng
+> `cai-dat-local.cmd` (hoặc `-Seed` để có dữ liệu demo), rồi `chay-local.cmd`.
+> V006 bổ sung 4 bảng runtime, V007 bổ sung index; V003–V005 bổ sung RBAC và
+> mẫu email xác minh. Xem [hướng dẫn hiện tại](../README.md#chạy-trên-máy-windows-mới).
+
 Ngày triển khai: 16/10/2026. Đích: [ADR](DB_SPEC_ARCHITECTURE_DECISIONS.md), [catalog](DB_SPEC_CORE_ENTITY_CATALOG.md), [báo cáo thay đổi Java](JAVA_ENTITY_CATALOG_GAP_ANALYSIS.md).
 
 ## Kết quả

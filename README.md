@@ -2,10 +2,50 @@
 
 Spring Boot API for room booking.
 
+## Chạy trên máy Windows mới
+
+Cài Git, **JDK 17** và Docker Desktop; mở Docker Desktop và đặt `JAVA_HOME` trỏ
+đến JDK. Clone repo, rồi mở **thư mục chứa `pom.xml`** trong IntelliJ/terminal
+(root Git và root Maven có thể khác nhau).
+
+```powershell
+.\cai-dat-local.cmd
+.\chay-local.cmd
+```
+
+Lệnh cài đặt tự tạo `.env` nếu thiếu, khởi động PostgreSQL/Redis/MinIO/Mailpit,
+build và chạy unit test, khởi tạo baseline, cập nhật V006/V007, rồi áp dụng và
+kiểm tra RBAC V003–V005. Dừng ngay nếu một bước lỗi; không xóa volume hay DB cũ.
+Lần đầu cần Internet để tải Maven, dependency và Docker image.
+
+Muốn tạo thêm 100 booking và tài khoản demo ngay khi cài:
+
+```powershell
+.\cai-dat-local.cmd -Seed
+```
+
+Hai lệnh local đọc cấu hình Compose/.env vào môi trường backend và script con;
+biến môi trường đã đặt sẵn được ưu tiên. Nếu chạy trực tiếp từ IntelliJ, vẫn cần
+tự đặt các biến tương ứng khi đổi `.env`. Không đổi `POSTGRES_*` sau khi volume
+đã có dữ liệu rồi mong PostgreSQL tự đổi tài khoản/database.
+
+Swagger: http://localhost:8080/swagger-ui/index.html.
+Mailpit (email xác minh thử): http://localhost:8025.
+
+Xem [kết quả kiểm tra clone/build/DB và các lỗi đã sửa](docs/LOCAL_SETUP_AUDIT.md).
+
+`mvnw.cmd test` chạy test không cần dịch vụ local. Test khởi động thật được bật
+tường minh sau khi cài DB bằng `$env:DATPHONG_APP_INTEGRATION='true'` rồi chạy
+`.\mvnw.cmd -Dtest=DatphongApplicationTests test`.
+
+Nếu báo lỗi `TimeZone: Asia/SaiGon`, các entry point backend/script hiện dùng
+`Asia/Ho_Chi_Minh`. Với công cụ DB bên ngoài, đặt múi giờ JVM của công cụ thành
+`-Duser.timezone=Asia/Ho_Chi_Minh`. Không cần tạo lại DB.
+
 Đã tách API hồ sơ cá nhân và quản trị User, bổ sung Permission và giới hạn Audit Log
 cho ADMIN/SUPPORT có AUDIT_READ theo UC-19. Xem [báo cáo triển khai và hướng dẫn Swagger](docs/BAO_CAO_USER_PERMISSION_AUDIT_LOG.md).
 Với DB đã có schema, chạy .\cap-nhat-rbac.cmd để bổ sung catalog/grant;
-dùng -VerifyOnly để kiểm chứng cả ADMIN và SUPPORT. Lệnh này áp dụng V003 và V004 trong cùng transaction.
+dùng -VerifyOnly để kiểm chứng cả ADMIN và SUPPORT. Lệnh này áp dụng V003–V005 trong cùng transaction.
 Khởi động lại backend sau cập nhật; đăng nhập lấy JWT mới nếu token cũ đã bị thu hồi.
 
 Đọc [luồng request từ FE đến response](docs/REQUEST_FLOW.md) để biết thứ tự xử lý,
@@ -22,7 +62,7 @@ trạng thái đủ 36 use case, lỗi cần ưu tiên và kết quả kiểm ch
 
 ## Start dependencies with Docker
 
-Docker Compose runs PostgreSQL, Redis, and MinIO only. Run the Spring Boot
+Docker Compose runs PostgreSQL, Redis, MinIO, and Mailpit. Run the Spring Boot
 application from IntelliJ or Maven on port 8080.
 
 Copy the example environment file if you want to customize local credentials:
@@ -61,12 +101,14 @@ Reset local database, Redis, and MinIO data:
 docker compose down -v
 ```
 
-## Khởi tạo DB bằng một lệnh trên Windows
+## Các bước DB thủ công trên Windows
 
 Sau khi pull code, mở terminal tại thư mục có `pom.xml` và chạy:
 
 ```powershell
 .\khoi-tao-db.cmd
+.\cap-nhat-schema.cmd
+.\cap-nhat-rbac.cmd
 ```
 
 Cần cài JDK 17 trở lên. Nếu chưa có PostgreSQL đang chạy tại `localhost:5435`,
@@ -75,7 +117,8 @@ Docker Compose. JDBC được tải tự động bằng Maven Wrapper ở lần 
 
 Script tạo database nếu chưa tồn tại, tự chọn `V000 → V002` cho DB chưa có bảng
 hoặc `V001 → V002` cho DB cũ chưa có dữ liệu. Hai tệp SQL chạy trong cùng một giao dịch;
-lỗi ở bất kỳ bước nào sẽ hoàn tác thay đổi cấu trúc. Kết quả là 74 bảng rỗng.
+lỗi ở bất kỳ bước nào sẽ hoàn tác thay đổi cấu trúc. Baseline có 74 bảng rỗng;
+`cap-nhat-schema.cmd` tiếp tục thêm 4 bảng runtime (tổng 78 bảng ở `public`).
 Lịch sử khởi tạo được lưu trong schema kỹ thuật `datphong_schema`, tách khỏi 74 bảng
 nghiệp vụ ở `public`. Chạy lại sẽ nhận biết phiên bản đã áp dụng và bỏ qua SQL.
 DB có dữ liệu nhưng chưa có lịch sử này sẽ bị từ chối, không bị xóa để tạo lại.
@@ -90,7 +133,7 @@ Chi tiết và cách chỉ định JDK/JDBC: [hướng dẫn khởi tạo schema
 
 ## Tạo dữ liệu test theo đặc tả
 
-Khi PostgreSQL đã có schema và MinIO đang chạy, tạo bộ dữ liệu UC bằng:
+Khi đã chạy đủ ba bước DB ở trên và MinIO đang chạy, tạo bộ dữ liệu UC bằng:
 
 ```powershell
 .\tao-du-lieu-test.cmd
@@ -150,7 +193,7 @@ Get-Content -Raw scripts/sql/normalize-user-status.sql | docker compose exec -T 
 The script converts legacy status names, updates the PostgreSQL check
 constraint, and sets the default for raw SQL inserts to `IN_ACTIVE`.
 It preserves `active` flags, account records, and passwords.
-Hibernate `ddl-auto: update` does not replace this data migration.
+Hibernate `ddl-auto: validate` does not apply this data migration.
 
 ## Maven commands
 
@@ -186,9 +229,8 @@ After that, your teammate can clone and run:
 ```powershell
 git clone https://github.com/<your-username>/<repo-name>.git
 cd <repo-name>
-Copy-Item .env.example .env
-.\khoi-tao-db.cmd
-docker compose up -d
+.\cai-dat-local.cmd
+.\chay-local.cmd
 ```
 
 Open the project in IntelliJ, reload Maven, and run

@@ -9,6 +9,7 @@ import java.util.regex.*;
 /** Công cụ khởi tạo schema; đọc thông tin kết nối từ môi trường/application.yaml, không ghi mật khẩu vào log. */
 public class SchemaTool {
     public static void main(String[] args) throws Exception {
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
         String command = args.length == 0 ? "inspect" : args[0];
         if (!(command.equals("inspect") && args.length <= 1)
                 && !(command.equals("initialize") && args.length == 1)

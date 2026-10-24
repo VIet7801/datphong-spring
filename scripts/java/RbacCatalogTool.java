@@ -8,6 +8,7 @@ public class RbacCatalogTool {
             "ROLE_READ", "ROLE_MANAGE", "PERMISSION_READ", "PERMISSION_MANAGE", "AUDIT_READ");
 
     public static void main(String[] args) throws Exception {
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
         String command = args.length == 0 ? "verify" : args[0];
         if (!Set.of("inspect", "verify", "apply").contains(command) || args.length > 1) {
             throw new IllegalArgumentException("inspect | verify | apply");

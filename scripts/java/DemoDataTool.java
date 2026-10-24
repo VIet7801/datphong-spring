@@ -56,6 +56,7 @@ public class DemoDataTool {
     }
 
     public static void main(String[] args) throws Exception {
+        TimeZone.setDefault(TimeZone.getTimeZone(ZONE));
         String command = args.length == 0 ? "verify" : args[0];
         if (args.length > 1 || !Set.of("seed", "verify").contains(command))
             throw new IllegalArgumentException("seed | verify");
@@ -143,7 +144,14 @@ public class DemoDataTool {
     }
 
     void preflight() throws Exception {
-        if (columns.size() != 74) throw new IllegalStateException("Cần schema 74 bảng đã khởi tạo bằng khoi-tao-db.cmd.");
+        Set<String> missing = new TreeSet<>();
+        for (String file : List.of("V000__empty_database_baseline.sql", "V006__runtime_schema_alignment.sql")) {
+            Matcher tables = Pattern.compile("(?i)create\\s+table\\s+(?:if\\s+not\\s+exists\\s+)?([a-z_][a-z_0-9]*)")
+                    .matcher(Files.readString(Path.of("scripts/sql", file)));
+            while (tables.find()) if (!columns.containsKey(tables.group(1))) missing.add(tables.group(1));
+        }
+        if (!missing.isEmpty()) throw new IllegalStateException(
+                "Thiếu bảng " + missing + ". Chạy khoi-tao-db.cmd và cap-nhat-schema.cmd trước.");
         if (scalar("SELECT count(*) FROM bookings WHERE booking_code LIKE 'DEMO-%'") != 0)
             throw new IllegalStateException("Đã có booking DEMO- nhưng thiếu marker seed; cần kiểm tra dữ liệu trước.");
         for (Account a : accounts)
@@ -243,6 +251,14 @@ public class DemoDataTool {
         List<String> events = List.of("ACCOUNT_CREATED", "EMAIL_VERIFICATION", "BOOKING_CONFIRMED", "PAYMENT_SUCCEEDED", "PAYMENT_FAILED",
                 "REFUND_SUCCEEDED", "REFUND_FAILED", "CHECKIN_REMINDER", "COMPLAINT_REPLY", "CHECKIN_CONFIRMED");
         for (String event : events) {
+            // V005 already publishes the real verification template. Preserve it on fresh installs.
+            List<Map<String,Object>> existing = query("SELECT v.id FROM email_templates t JOIN email_template_versions v "
+                    + "ON v.template_id=t.id AND v.version_no=t.active_version "
+                    + "WHERE t.template_code=? AND t.locale='vi-VN' AND t.status='ACTIVE' AND v.published_at IS NOT NULL", event);
+            if (!existing.isEmpty()) {
+                templateVersions.put(event, ((Number) existing.get(0).get("id")).longValue());
+                continue;
+            }
             long template = insert("email_templates", "template_code", event, "locale", "vi-VN", "active_version", null, "status", "DRAFT");
             long version = insert("email_template_versions", "template_id", template, "version_no", 1,
                     "subject", "[Vivu Test] " + event + " - {{reference}}",
@@ -270,15 +286,13 @@ public class DemoDataTool {
             long host = account("HOST", p < 6 ? p / 2 : p - 6).id;
             String status = p < 6 ? "PUBLISHED" : List.of("DRAFT", "PAUSED", "ARCHIVED").get(p-6);
             long property = insert("properties", "owner_id", host, "name", titles[p], "slug", "demo-property-" + (p+1),
-                    "address", (10+p) + " đường Du Lịch, " + cities[p], "address_line", (10+p) + " đường Du Lịch, " + cities[p],
+                    "address", (10+p) + " đường Du Lịch, " + cities[p],
                     "city", cities[p], "country", "VN", "timezone", ZONE.getId(), "latitude", BigDecimal.valueOf(lats[p]), "longitude", BigDecimal.valueOf(lons[p]),
                     "description", "Cơ sở mẫu " + titles[p] + ", phục vụ kiểm thử tìm kiếm, giá, quyền chủ sở hữu và đặt phòng.",
                     "status", status, "checkin_local", LocalTime.of(14,0), "checkout_local", LocalTime.NOON,
-                    "check_in_from", LocalTime.of(14,0), "check_out_until", LocalTime.NOON, "public_contact", "09090000%02d".formatted(p+1));
-            Json policySnapshot = json("code", "DEMO-FLEX", "revision", 1, "timezone", ZONE.getId(), "rules",
-                    List.of(map("daysBeforeCheckin", 7, "refundPercent", 100), map("daysBeforeCheckin", 2, "refundPercent", 50), map("daysBeforeCheckin", 0, "refundPercent", 0)));
+                    "public_contact", "09090000%02d".formatted(p+1));
             long policy = insert("cancellation_policies", "property_id", property, "host_id", host, "name", "Linh hoạt 7 ngày - " + titles[p],
-                    "policy_json", policySnapshot, "effective_at", catalogTime, "active", true, "policy_revision", 1);
+                    "effective_at", catalogTime, "active", true, "policy_revision", 1);
             exec("UPDATE properties SET cancellation_policy_id=? WHERE id=?", policy, property);
             for (int days : List.of(7,2,0)) insert("cancellation_policy_rules", "policy_id", policy, "days_before_checkin", days, "refund_percent", days==7 ? 100 : days==2 ? 50 : 0);
             for (int t=0; t<3; t++) {
@@ -309,7 +323,7 @@ public class DemoDataTool {
                             "price_per_night", base.longValueExact(), "description", "Phòng " + code + ", dữ liệu mẫu " + status, "image_url", imageUrl);
                     long asset = insert("media_assets", "property_id", property, "room_id", room, "created_by_id", host,
                             "object_key", imageKey, "content_type", "image/png", "size_bytes", (long)image.length, "checksum_sha256", sha(image),
-                            "status", "READY", "finalized_at", catalogTime.plusSeconds(60), "upload_expires_at", catalogTime.plusSeconds(600), "sort_order", 0);
+                            "status", "READY", "finalized_at", catalogTime.plusSeconds(60), "upload_expires_at", catalogTime.plusSeconds(600));
                     insert("room_images", "room_id", room, "asset_id", asset, "media_type", "IMAGE", "sort_order", 0, "cover", true, "url", imageUrl);
                     for (int a=0; a<3; a++) insert("room_amenities", "room_id", room, "amenity_id", amenities.get(a));
                     Room value = new Room(room,unit,type,property,host,p,t,base,capacity,code,imageUrl,asset);
@@ -325,7 +339,7 @@ public class DemoDataTool {
         for (String state : List.of("PENDING", "PENDING_EXPIRED", "FAILED", "DELETED"))
             insert("media_assets", "property_id", sample.property, "created_by_id", sample.host, "object_key", "demo/"+DATASET+"/upload-"+state.toLowerCase(Locale.ROOT)+".png",
                     "content_type", "image/png", "size_bytes", 1024L, "status", state,
-                    "upload_expires_at", state.equals("PENDING") ? now.plusSeconds(600) : now.minusSeconds(3600), "sort_order", 0,
+                    "upload_expires_at", state.equals("PENDING") ? now.plusSeconds(600) : now.minusSeconds(3600),
                     "deleted_at", state.equals("DELETED") ? now.minusSeconds(300) : null);
         insert("room_sale_blocks", "room_id", sample.id, "date_from", today.plusDays(90), "date_to", today.plusDays(93), "reason", "Bảo trì tương lai", "created_by_id", sample.host);
         insert("room_sale_blocks", "room_id", sample.id, "date_from", today.plusDays(80), "date_to", today.plusDays(82), "reason", "Lịch bảo trì đã hủy", "created_by_id", sample.host,
@@ -385,7 +399,7 @@ public class DemoDataTool {
                     "room_type_id",room.type,"room_unit_id",room.unit,"room_id",room.id,"check_in",in,"check_out",out,
                     "guest_count",1+i%room.capacity,"status",status,"expires_at",expires,"subtotal_amount",subtotal,"tax_amount",tax,
                     "fee_amount",fees,"total_amount",total,"currency","VND","cancellation_policy_snapshot",snapshot,
-                    "quote_version",1L,"price_version",1L,"idempotency_key","demo-hold:"+i,
+                    "price_version",1L,"idempotency_key","demo-hold:"+i,
                     "property_timezone_snapshot",ZONE.getId(),"checkin_local_snapshot",LocalTime.of(14,0),
                     "source_channel",source,"guest_segment_snapshot",segment,"created_at",created,"updated_at",now,
                     "confirmed_at",paid ? captured.plusSeconds(1) : null,
@@ -605,7 +619,7 @@ public class DemoDataTool {
                 insert("conversation_participants","conversation_id",conversation,"user_id",support,"participant_role","SUPPORT","joined_at",at.plusSeconds(300),"assigned_by_id",admin);
                 insert("complaint_tickets","conversation_id",conversation,"booking_id",booking,"origin_message_id",message,
                         "created_by_id",customer.id,"assigned_support_id",support,"status",complaintStatus,"issue_type","ROOM_FACILITY",
-                        "severity",i%2==0 ? "HIGH" : "NORMAL","reason","Điều hòa cần được kiểm tra","response_due_at",at.plusSeconds(7200),
+                        "severity",i%2==0 ? "HIGH" : "NORMAL","response_due_at",at.plusSeconds(7200),
                         "acknowledged_at",complaintStatus.equals("OPEN") ? null : at.plusSeconds(600),"resolved_at",resolved ? at.plusSeconds(1200) : null,
                         "resolved_by_id",resolved ? support : null,"resolution",resolved ? "Đã kiểm tra và xử lý thiết bị" : null,
                         "customer_confirmed_at",complaintStatus.equals("CLOSED") ? at.plusSeconds(1800) : null,
@@ -746,7 +760,7 @@ public class DemoDataTool {
         out.append("Đã seed vào DB hiện tại lúc ").append(now).append(". Ngày nghiệp vụ: **").append(today).append("**, múi giờ `Asia/Ho_Chi_Minh`.\n\n");
         out.append("Tài khoản và mật khẩu: [TAI_KHOAN_TEST.md](TAI_KHOAN_TEST.md).\n\n");
         out.append("## Chạy lại và kiểm tra\n\n```powershell\n.\\tao-du-lieu-test.cmd\n.\\tao-du-lieu-test.cmd -VerifyOnly\n```\n\n");
-        out.append("Script đọc cấu hình `application.yaml` và các biến môi trường giống backend. Cần JDK 17+, PostgreSQL đã có 74 bảng, và MinIO đang chạy. Nếu DB mới, chạy `khoi-tao-db.cmd` trước. Không tự seed khi ứng dụng khởi động.\n\n");
+        out.append("Script đọc cấu hình `application.yaml` và các biến môi trường giống backend. Cần JDK 17+, schema đã cập nhật đầy đủ, và MinIO đang chạy. Với DB mới, dùng `cai-dat-local.cmd -Seed` để build, khởi tạo, cập nhật schema/RBAC rồi seed. Không tự seed khi ứng dụng khởi động.\n\n");
         out.append("Lịch sử nằm tại `datphong_schema.seed_history`; chạy lại bỏ qua toàn bộ seed, giữ nguyên ngày và các chỉnh sửa test. Không xóa marker để seed chồng. Toàn bộ ghi DB nằm trong một transaction và được kiểm tra trước commit; lỗi rollback DB. Ảnh PNG và CSV fixture nằm trong prefix MinIO `demo/uc-demo-v1/`, có thể được ghi lại nếu lần trước rollback. Bucket giữ nguyên chính sách truy cập; ảnh ở bucket private cần URL ký qua API media.\n\n");
         out.append("## 100 booking theo trạng thái\n\n| Mã booking | Trạng thái | Số lượng |\n|---|---|---|\n");
         for (Map<String,Object> row:query("SELECT min(booking_code) first,max(booking_code) last,status,count(*) count FROM bookings WHERE booking_code LIKE 'DEMO-%' GROUP BY status ORDER BY min(booking_code)"))
